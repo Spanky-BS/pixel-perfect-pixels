@@ -12,7 +12,7 @@ import { customersQuery } from "@/lib/queries";
 import { customerName } from "@/lib/app";
 
 export const Route = createFileRoute("/_authenticated/baustellen/neu")({
-  validateSearch: (s: Record<string, unknown>) => ({ kunde: typeof s.kunde === "string" ? s.kunde : undefined }),
+  validateSearch: (s: Record<string, unknown>): { kunde?: string } => (typeof s["kunde"] === "string" ? { kunde: s["kunde"] as string } : {}),
   head: () => ({
     meta: [
       { title: "Neue Baustelle – Haustechnik Nordwestschweiz" },

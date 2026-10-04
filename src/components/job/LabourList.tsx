@@ -28,8 +28,7 @@ export function useLabour(jobId: string) {
 export function LabourEditor({ draft, onClose }: { draft: Draft | null; onClose: () => void }) {
   const qc = useQueryClient();
   const [d, setD] = useState<Draft | null>(draft);
-  if (draft && d !== draft && (d?.id !== draft.id || !d)) setD(draft);
-  const cur = d ?? draft;
+  const cur = d;
   const set = (k: keyof Labour, v: unknown) => cur && setD({ ...cur, [k]: v });
 
   async function save() {

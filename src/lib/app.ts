@@ -51,7 +51,7 @@ export async function uploadMedia(jobId: string, file: Blob, ext: string) {
   const uid = await requireUserId();
   const path = `${uid}/${jobId}/${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type || undefined,
+    contentType: file.type || "application/octet-stream",
   });
   if (error) throw error;
   return path;

@@ -29,8 +29,7 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
   const qc = useQueryClient();
   const cats = useQuery(categoriesQuery());
   const [d, setD] = useState<Draft | null>(draft);
-  if (draft && d?.id !== draft.id && d?.job_id !== draft.job_id) setD(draft);
-  const cur = d ?? draft;
+  const cur = d;
 
   async function save() {
     if (!cur) return;
@@ -100,7 +99,7 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
   async function move(i: number, dir: -1 | 1) {
     const j = i + dir;
     if (j < 0 || j >= list.length) return;
-    const a = list[i], b = list[j];
+    const a = list[i]!, b = list[j]!;
     await Promise.all([
       supabase.from("material_requirements").update({ sort_order: j }).eq("id", a.id),
       supabase.from("material_requirements").update({ sort_order: i }).eq("id", b.id),
