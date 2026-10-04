@@ -1,0 +1,12 @@
+{
+  "name": "Haustechnik Nordwestschweiz",
+  "short_name": "HT NWS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#1d3a6b",
+  "lang": "de-CH",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
