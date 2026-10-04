@@ -14,6 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_suggestions: {
+        Row: {
+          confidence: string | null
+          created_at: string
+          id: string
+          job_id: string
+          kind: string
+          payload: Json
+          state: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: string | null
+          created_at?: string
+          id?: string
+          job_id: string
+          kind: string
+          payload?: Json
+          state?: string
+          user_id?: string
+        }
+        Update: {
+          confidence?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string
+          kind?: string
+          payload?: Json
+          state?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bexio_sync: {
+        Row: {
+          bexio_id: string | null
+          created_at: string
+          entity: string
+          entity_id: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          bexio_id?: string | null
+          created_at?: string
+          entity: string
+          entity_id: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Update: {
+          bexio_id?: string | null
+          created_at?: string
+          entity?: string
+          entity_id?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cost_estimate_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string
+          estimate_id: string
+          id: string
+          section: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          description?: string
+          estimate_id: string
+          id?: string
+          section?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string
+          estimate_id?: string
+          id?: string
+          section?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_estimate_items_estimate_id_fkey"
+            columns: ["estimate_id"]
+            isOneToOne: false
+            referencedRelation: "cost_estimates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cost_estimates: {
+        Row: {
+          confidence: string
+          created_at: string
+          id: string
+          job_id: string
+          notes: string | null
+          tolerance: number
+          updated_at: string
+          user_id: string
+          version: number
+          visibility: string
+        }
+        Insert: {
+          confidence?: string
+          created_at?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          tolerance?: number
+          updated_at?: string
+          user_id?: string
+          version?: number
+          visibility?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          tolerance?: number
+          updated_at?: string
+          user_id?: string
+          version?: number
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_estimates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           city: string | null
@@ -105,42 +264,69 @@ export type Database = {
       }
       jobs: {
         Row: {
+          appointment_at: string | null
           city: string | null
+          completed_at: string | null
+          completion_notes: string | null
           created_at: string
           customer_id: string | null
+          customer_request: string | null
           id: string
+          internal_notes: string | null
+          job_type: string
           notes: string | null
+          problem_description: string | null
+          signature_path: string | null
           status: string
           street: string | null
           title: string
           updated_at: string
           user_id: string
+          work_confirmed: boolean
           zip: string | null
         }
         Insert: {
+          appointment_at?: string | null
           city?: string | null
+          completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_request?: string | null
           id?: string
+          internal_notes?: string | null
+          job_type?: string
           notes?: string | null
+          problem_description?: string | null
+          signature_path?: string | null
           status?: string
           street?: string | null
           title: string
           updated_at?: string
           user_id?: string
+          work_confirmed?: boolean
           zip?: string | null
         }
         Update: {
+          appointment_at?: string | null
           city?: string | null
+          completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           customer_id?: string | null
+          customer_request?: string | null
           id?: string
+          internal_notes?: string | null
+          job_type?: string
           notes?: string | null
+          problem_description?: string | null
+          signature_path?: string | null
           status?: string
           street?: string | null
           title?: string
           updated_at?: string
           user_id?: string
+          work_confirmed?: boolean
           zip?: string | null
         }
         Relationships: [
@@ -155,6 +341,7 @@ export type Database = {
       }
       labour_items: {
         Row: {
+          confidence: string | null
           created_at: string
           description: string
           hourly_rate: number
@@ -163,10 +350,12 @@ export type Database = {
           job_id: string
           notes: string | null
           sort_order: number
+          source: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          confidence?: string | null
           created_at?: string
           description?: string
           hourly_rate?: number
@@ -175,10 +364,12 @@ export type Database = {
           job_id: string
           notes?: string | null
           sort_order?: number
+          source?: string
           updated_at?: string
           user_id?: string
         }
         Update: {
+          confidence?: string | null
           created_at?: string
           description?: string
           hourly_rate?: number
@@ -187,6 +378,7 @@ export type Database = {
           job_id?: string
           notes?: string | null
           sort_order?: number
+          source?: string
           updated_at?: string
           user_id?: string
         }
@@ -227,6 +419,7 @@ export type Database = {
       material_requirements: {
         Row: {
           category_id: string | null
+          confidence: string | null
           created_at: string
           description: string
           dimensions: string | null
@@ -237,6 +430,7 @@ export type Database = {
           preferred_brand: string | null
           quantity: number
           sort_order: number
+          source: string
           status: string
           unit: string
           updated_at: string
@@ -244,6 +438,7 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          confidence?: string | null
           created_at?: string
           description?: string
           dimensions?: string | null
@@ -254,6 +449,7 @@ export type Database = {
           preferred_brand?: string | null
           quantity?: number
           sort_order?: number
+          source?: string
           status?: string
           unit?: string
           updated_at?: string
@@ -261,6 +457,7 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          confidence?: string | null
           created_at?: string
           description?: string
           dimensions?: string | null
@@ -271,6 +468,7 @@ export type Database = {
           preferred_brand?: string | null
           quantity?: number
           sort_order?: number
+          source?: string
           status?: string
           unit?: string
           updated_at?: string
@@ -286,6 +484,47 @@ export type Database = {
           },
           {
             foreignKeyName: "material_requirements_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      open_questions: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          source: string
+          status: string
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          source?: string
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          source?: string
+          status?: string
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "open_questions_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
@@ -314,33 +553,349 @@ export type Database = {
         }
         Relationships: []
       }
+      quotations: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string | null
+          status: string
+          total: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          status?: string
+          total?: number | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          status?: string
+          total?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      selected_products: {
+        Row: {
+          created_at: string
+          id: string
+          is_preferred: boolean
+          material_id: string | null
+          supplier_product_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_preferred?: boolean
+          material_id?: string | null
+          supplier_product_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_preferred?: boolean
+          material_id?: string | null
+          supplier_product_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "selected_products_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "material_requirements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "selected_products_supplier_product_id_fkey"
+            columns: ["supplier_product_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_additional_costs: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          job_id: string
+          kind: string
+          price: number
+          quantity: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_id: string
+          kind?: string
+          price?: number
+          quantity?: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_id?: string
+          kind?: string
+          price?: number
+          quantity?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_additional_costs_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_labour_entries: {
+        Row: {
+          created_at: string
+          description: string
+          end_at: string | null
+          hourly_rate: number
+          hours: number
+          id: string
+          job_id: string
+          start_at: string | null
+          technician: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          end_at?: string | null
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          job_id: string
+          start_at?: string | null
+          technician?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          end_at?: string | null
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          job_id?: string
+          start_at?: string | null
+          technician?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_labour_entries_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_material_entries: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          job_id: string
+          notes: string | null
+          purchase_price: number | null
+          quantity: number
+          sales_price: number
+          supplier: string | null
+          supplier_article_no: string | null
+          unit: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_id: string
+          notes?: string | null
+          purchase_price?: number | null
+          quantity?: number
+          sales_price?: number
+          supplier?: string | null
+          supplier_article_no?: string | null
+          unit?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          job_id?: string
+          notes?: string | null
+          purchase_price?: number | null
+          quantity?: number
+          sales_price?: number
+          supplier?: string | null
+          supplier_article_no?: string | null
+          unit?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_material_entries_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settings: {
         Row: {
           company_name: string
           currency: string
           default_hourly_rate: number
           default_material_markup: number
+          estimate_tolerance: number
+          service_hourly_rate: number
+          small_material_allowance: number
+          travel_rate: number
           updated_at: string
           user_id: string
           vat_rate: number
+          vehicle_fee: number
         }
         Insert: {
           company_name?: string
           currency?: string
           default_hourly_rate?: number
           default_material_markup?: number
+          estimate_tolerance?: number
+          service_hourly_rate?: number
+          small_material_allowance?: number
+          travel_rate?: number
           updated_at?: string
           user_id: string
           vat_rate?: number
+          vehicle_fee?: number
         }
         Update: {
           company_name?: string
           currency?: string
           default_hourly_rate?: number
           default_material_markup?: number
+          estimate_tolerance?: number
+          service_hourly_rate?: number
+          small_material_allowance?: number
+          travel_rate?: number
           updated_at?: string
           user_id?: string
           vat_rate?: number
+          vehicle_fee?: number
+        }
+        Relationships: []
+      }
+      supplier_products: {
+        Row: {
+          created_at: string
+          delivery_date: string | null
+          id: string
+          image_url: string | null
+          manufacturer: string | null
+          manufacturer_article_no: string | null
+          name: string | null
+          purchase_price: number | null
+          stock: number | null
+          supplier_article_no: string | null
+          supplier_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          image_url?: string | null
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          name?: string | null
+          purchase_price?: number | null
+          stock?: number | null
+          supplier_article_no?: string | null
+          supplier_id?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_date?: string | null
+          id?: string
+          image_url?: string | null
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          name?: string | null
+          purchase_price?: number | null
+          stock?: number | null
+          supplier_article_no?: string | null
+          supplier_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_products_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          connection_status: string
+          created_at: string
+          id: string
+          name: string
+          preferred: boolean
+          priority: number
+          user_id: string
+        }
+        Insert: {
+          connection_status?: string
+          created_at?: string
+          id?: string
+          name: string
+          preferred?: boolean
+          priority?: number
+          user_id?: string
+        }
+        Update: {
+          connection_status?: string
+          created_at?: string
+          id?: string
+          name?: string
+          preferred?: boolean
+          priority?: number
+          user_id?: string
         }
         Relationships: []
       }

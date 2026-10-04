@@ -13,7 +13,7 @@ export type Settings = Tables<"settings">;
 export const JOB_STATUSES = ["Neu", "Aufnahme", "Materialauswahl", "Offerte", "Auftrag", "Abgeschlossen"] as const;
 export const MATERIAL_STATUSES = ["Offen", "Produkt suchen", "Produkt ausgewählt", "Bestätigt"] as const;
 export const UNITS = ["Stk", "m", "m²", "Set", "Pkg", "l", "kg"];
-export const PHOTO_CATEGORIES = ["Bestand", "Schaden", "Anschluss", "Masse", "Typenschild", "Sonstiges"];
+export const PHOTO_CATEGORIES = ["Vorher", "Nachher", "Bestand", "Schaden", "Anschluss", "Masse", "Typenschild", "Sonstiges"];
 
 export function customerName(c?: Pick<Customer, "company_name" | "first_name" | "last_name"> | null) {
   if (!c) return "Ohne Kunde";
@@ -74,8 +74,50 @@ export const statusTone: Record<string, string> = {
   Offerte: "bg-accent text-accent-foreground",
   Auftrag: "bg-success/15 text-success",
   Abgeschlossen: "bg-muted text-muted-foreground",
+  Begehung: "bg-primary text-primary-foreground",
+  Analyse: "bg-primary/80 text-primary-foreground",
+  Grobkosten: "bg-warning/20 text-foreground",
+  Produktauswahl: "bg-warning/20 text-foreground",
+  Kalkulation: "bg-accent text-accent-foreground",
+  Ausführung: "bg-success/15 text-success",
+  Rechnung: "bg-success/15 text-success",
+  Geplant: "bg-accent text-accent-foreground",
+  "In Arbeit": "bg-primary text-primary-foreground",
+  Erledigt: "bg-success/15 text-success",
+  Verrechnet: "bg-muted text-muted-foreground",
+  offen: "bg-warning/20 text-foreground",
+  "geklärt": "bg-success/15 text-success",
+  "nicht relevant": "bg-muted text-muted-foreground",
   Offen: "bg-muted text-muted-foreground",
   "Produkt suchen": "bg-warning/20 text-foreground",
   "Produkt ausgewählt": "bg-accent text-accent-foreground",
   Bestätigt: "bg-success/15 text-success",
 };
+
+// ---- Job types & workflow steps ----
+export type JobType = "project" | "service";
+export const JOB_TYPE_LABEL: Record<JobType, string> = { project: "Projekt", service: "Regie / Service" };
+
+export const PROJECT_STEPS = ["Begehung", "Analyse", "Grobkosten", "Produktauswahl", "Kalkulation", "Offerte", "Auftrag", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
+export const SERVICE_STEPS = ["Neu", "Geplant", "In Arbeit", "Erledigt", "Verrechnet"] as const;
+
+const LEGACY: Record<string, string> = { Neu: "Begehung", Aufnahme: "Begehung", Materialauswahl: "Produktauswahl" };
+export function stepsFor(type: string): readonly string[] {
+  return type === "service" ? SERVICE_STEPS : PROJECT_STEPS;
+}
+export function normalizeStatus(type: string, status: string) {
+  if (type === "service") return status;
+  return LEGACY[status] ?? status;
+}
+export function isClosed(type: string, status: string) {
+  const s = normalizeStatus(type, status);
+  return type === "service" ? s === "Erledigt" || s === "Verrechnet" : s === "Abgeschlossen";
+}
+
+export const OPEN_STATUSES = ["offen", "geklärt", "nicht relevant"] as const;
+export const CONFIDENCE = ["niedrig", "mittel", "hoch"] as const;
+export const ESTIMATE_SECTIONS = ["Sanitärapparate", "Armaturen", "Installationsmaterial", "Arbeitsaufwand", "Demontage", "Entsorgung", "Anfahrt", "Kleinmaterial", "Reserve / Unvorhergesehenes", "Sonstiges"];
+export const EXTRA_COST_KINDS = ["Anfahrt", "Fahrzeugpauschale", "Entsorgung", "Kleinmaterial", "Spesen", "Sonstiges"];
+export const ESTIMATE_DISCLAIMER = "Unverbindliche Grobkostenschätzung auf Basis der aktuellen Bestandesaufnahme und Kundenwünsche. Die definitive Offerte erfolgt nach Produktauswahl und Detailprüfung.";
+
+export const roundTo = (n: number, step = 100) => Math.round(n / step) * step;

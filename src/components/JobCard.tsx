@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin, ChevronRight } from "lucide-react";
-import { address, customerName, formatDate, type Customer, type Job } from "@/lib/app";
+import { JOB_TYPE_LABEL, address, customerName, formatDate, normalizeStatus, type Customer, type Job } from "@/lib/app";
 import { StatusBadge } from "./Brand";
 
 export type JobWithCustomer = Job & { customers: Pick<Customer, "company_name" | "first_name" | "last_name"> | null };
@@ -18,7 +18,10 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
           <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {customerName(job.customers)}
           </span>
-          <StatusBadge status={job.status} />
+          <span className="flex shrink-0 items-center gap-1">
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${job.job_type === "service" ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{job.job_type === "service" ? "Regie" : JOB_TYPE_LABEL.project}</span>
+            <StatusBadge status={normalizeStatus(job.job_type, job.status)} />
+          </span>
         </div>
         <div className="truncate text-base font-semibold">{job.title}</div>
         {addr && (

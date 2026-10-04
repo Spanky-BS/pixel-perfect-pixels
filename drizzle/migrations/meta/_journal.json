@@ -8,6 +8,13 @@
       "when": 1791124144268,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791127746582,
+      "tag": "0001_project_service_workflows",
+      "breakpoints": true
     }
   ]
 }
