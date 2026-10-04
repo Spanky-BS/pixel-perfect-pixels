@@ -13,7 +13,7 @@ export type Settings = Tables<"settings">;
 export const JOB_STATUSES = ["Neu", "Aufnahme", "Materialauswahl", "Offerte", "Auftrag", "Abgeschlossen"] as const;
 export const MATERIAL_STATUSES = ["Offen", "Produkt suchen", "Produkt ausgewählt", "Bestätigt"] as const;
 export const UNITS = ["Stk", "m", "m²", "Set", "Pkg", "l", "kg"];
-export const PHOTO_CATEGORIES = ["Bestand", "Schaden", "Anschluss", "Masse", "Typenschild", "Sonstiges"];
+export const PHOTO_CATEGORIES = ["Vorher", "Nachher", "Bestand", "Schaden", "Anschluss", "Masse", "Typenschild", "Sonstiges"];
 
 export function customerName(c?: Pick<Customer, "company_name" | "first_name" | "last_name"> | null) {
   if (!c) return "Ohne Kunde";
