@@ -28,7 +28,7 @@ function SettingsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const settings = useQuery(settingsQuery());
-  const [s, setS] = useState({ company_name: "Haustechnik Nordwestschweiz", vat_rate: 8.1, default_hourly_rate: 120, default_material_markup: 0 });
+  const [s, setS] = useState({ company_name: "Haustechnik Nordwestschweiz", vat_rate: 8.1, default_hourly_rate: 120, default_material_markup: 0, estimate_tolerance: 20, service_hourly_rate: 120, travel_rate: 120, vehicle_fee: 0, small_material_allowance: 0 });
 
   useEffect(() => {
     if (settings.data) setS({
@@ -36,6 +36,11 @@ function SettingsPage() {
       vat_rate: Number(settings.data.vat_rate),
       default_hourly_rate: Number(settings.data.default_hourly_rate),
       default_material_markup: Number(settings.data.default_material_markup),
+      estimate_tolerance: Number(settings.data.estimate_tolerance),
+      service_hourly_rate: Number(settings.data.service_hourly_rate),
+      travel_rate: Number(settings.data.travel_rate),
+      vehicle_fee: Number(settings.data.vehicle_fee),
+      small_material_allowance: Number(settings.data.small_material_allowance),
     });
   }, [settings.data]);
 
@@ -64,7 +69,15 @@ function SettingsPage() {
           <Field label="Währung"><Input className="h-12 text-base" value="CHF" disabled /></Field>
           <Field label="MWST %"><Input className="h-12 text-base" type="number" step="0.1" inputMode="decimal" value={s.vat_rate} onChange={(e) => setS({ ...s, vat_rate: Number(e.target.value) })} /></Field>
           <Field label="Stundenansatz CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_hourly_rate} onChange={(e) => setS({ ...s, default_hourly_rate: Number(e.target.value) })} /></Field>
+          <Field label="Toleranz Grobkosten %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
+        </div>
+        <h2 className="section-title pt-2">Regie / Service</h2>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Service-Ansatz CHF/h"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.service_hourly_rate} onChange={(e) => setS({ ...s, service_hourly_rate: Number(e.target.value) })} /></Field>
+          <Field label="Fahrtzeit CHF/h"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.travel_rate} onChange={(e) => setS({ ...s, travel_rate: Number(e.target.value) })} /></Field>
+          <Field label="Fahrzeugpauschale CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.vehicle_fee} onChange={(e) => setS({ ...s, vehicle_fee: Number(e.target.value) })} /></Field>
+          <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ ...s, small_material_allowance: Number(e.target.value) })} /></Field>
         </div>
         <Button className="h-12 w-full font-semibold" onClick={save}>Speichern</Button>
       </section>
@@ -73,7 +86,11 @@ function SettingsPage() {
 
       <section className="space-y-2 rounded-xl border bg-card p-4">
         <h2 className="section-title">Lieferanten</h2>
-        <p className="text-sm text-muted-foreground">Lieferanten, Login-Status, bevorzugter Lieferant und Priorität folgen in einer späteren Phase.</p>
+        <div className="flex items-center justify-between rounded-lg border p-3">
+          <div><div className="font-semibold">Richner</div><div className="text-xs text-muted-foreground">Bevorzugt · Priorität 1</div></div>
+          <span className="rounded bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">nicht verbunden</span>
+        </div>
+        <p className="text-sm text-muted-foreground">Lieferanten-Anbindung, Preisvergleich und Bexio folgen in einer späteren Phase.</p>
       </section>
 
       <Button variant="outline" className="h-12 w-full" onClick={logout}><LogOut className="h-4 w-4" /> Abmelden</Button>
