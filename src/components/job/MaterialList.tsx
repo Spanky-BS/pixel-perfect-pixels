@@ -29,8 +29,7 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
   const qc = useQueryClient();
   const cats = useQuery(categoriesQuery());
   const [d, setD] = useState<Draft | null>(draft);
-  if (draft && d?.id !== draft.id && d?.job_id !== draft.job_id) setD(draft);
-  const cur = d ?? draft;
+  const cur = d;
 
   async function save() {
     if (!cur) return;
