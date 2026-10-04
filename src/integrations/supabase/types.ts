@@ -14,7 +14,380 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          city: string | null
+          company_name: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          notes: string | null
+          phone: string | null
+          street: string | null
+          updated_at: string
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          notes?: string | null
+          phone?: string | null
+          street?: string | null
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          company_name?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          notes?: string | null
+          phone?: string | null
+          street?: string | null
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      job_photos: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          job_id: string
+          storage_path: string
+          taken_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id: string
+          storage_path: string
+          taken_at?: string
+          user_id?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id?: string
+          storage_path?: string
+          taken_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_photos_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          city: string | null
+          created_at: string
+          customer_id: string | null
+          id: string
+          notes: string | null
+          status: string
+          street: string | null
+          title: string
+          updated_at: string
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          street?: string | null
+          title: string
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: string
+          street?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      labour_items: {
+        Row: {
+          created_at: string
+          description: string
+          hourly_rate: number
+          hours: number
+          id: string
+          job_id: string
+          notes: string | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          job_id: string
+          notes?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          hourly_rate?: number
+          hours?: number
+          id?: string
+          job_id?: string
+          notes?: string | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      material_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      material_requirements: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string
+          dimensions: string | null
+          finish: string | null
+          id: string
+          job_id: string
+          notes: string | null
+          preferred_brand: string | null
+          quantity: number
+          sort_order: number
+          status: string
+          unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string
+          dimensions?: string | null
+          finish?: string | null
+          id?: string
+          job_id: string
+          notes?: string | null
+          preferred_brand?: string | null
+          quantity?: number
+          sort_order?: number
+          status?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string
+          dimensions?: string | null
+          finish?: string | null
+          id?: string
+          job_id?: string
+          notes?: string | null
+          preferred_brand?: string | null
+          quantity?: number
+          sort_order?: number
+          status?: string
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_requirements_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "material_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requirements_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          company_name: string
+          currency: string
+          default_hourly_rate: number
+          default_material_markup: number
+          updated_at: string
+          user_id: string
+          vat_rate: number
+        }
+        Insert: {
+          company_name?: string
+          currency?: string
+          default_hourly_rate?: number
+          default_material_markup?: number
+          updated_at?: string
+          user_id: string
+          vat_rate?: number
+        }
+        Update: {
+          company_name?: string
+          currency?: string
+          default_hourly_rate?: number
+          default_material_markup?: number
+          updated_at?: string
+          user_id?: string
+          vat_rate?: number
+        }
+        Relationships: []
+      }
+      voice_notes: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          id: string
+          job_id: string
+          kind: string
+          storage_path: string | null
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          job_id: string
+          kind?: string
+          storage_path?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          id?: string
+          job_id?: string
+          kind?: string
+          storage_path?: string | null
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voice_notes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
