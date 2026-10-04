@@ -10,33 +10,86 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedUebersichtRouteImport } from './routes/_authenticated/uebersicht'
+import { Route as AuthenticatedBaustellenIndexRouteImport } from './routes/_authenticated/baustellen/index'
+import { Route as AuthenticatedBaustellenNeuRouteImport } from './routes/_authenticated/baustellen/neu'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedUebersichtRoute = AuthenticatedUebersichtRouteImport.update({
+  id: '/uebersicht',
+  path: '/uebersicht',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedBaustellenIndexRoute =
+  AuthenticatedBaustellenIndexRouteImport.update({
+    id: '/baustellen/',
+    path: '/baustellen/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedBaustellenNeuRoute =
+  AuthenticatedBaustellenNeuRouteImport.update({
+    id: '/baustellen/neu',
+    path: '/baustellen/neu',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
+  '/baustellen/': typeof AuthenticatedBaustellenIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
+  '/baustellen': typeof AuthenticatedBaustellenIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/_authenticated/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
+  '/_authenticated/baustellen/': typeof AuthenticatedBaustellenIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/auth' | '/uebersicht' | '/baustellen/neu' | '/baustellen/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/auth' | '/uebersicht' | '/baustellen/neu' | '/baustellen'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/uebersicht'
+    | '/_authenticated/baustellen/neu'
+    | '/_authenticated/baustellen/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +101,63 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/uebersicht': {
+      id: '/_authenticated/uebersicht'
+      path: '/uebersicht'
+      fullPath: '/uebersicht'
+      preLoaderRoute: typeof AuthenticatedUebersichtRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/baustellen/': {
+      id: '/_authenticated/baustellen/'
+      path: '/baustellen'
+      fullPath: '/baustellen/'
+      preLoaderRoute: typeof AuthenticatedBaustellenIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/baustellen/neu': {
+      id: '/_authenticated/baustellen/neu'
+      path: '/baustellen/neu'
+      fullPath: '/baustellen/neu'
+      preLoaderRoute: typeof AuthenticatedBaustellenNeuRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedUebersichtRoute: typeof AuthenticatedUebersichtRoute
+  AuthenticatedBaustellenNeuRoute: typeof AuthenticatedBaustellenNeuRoute
+  AuthenticatedBaustellenIndexRoute: typeof AuthenticatedBaustellenIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedUebersichtRoute: AuthenticatedUebersichtRoute,
+  AuthenticatedBaustellenNeuRoute: AuthenticatedBaustellenNeuRoute,
+  AuthenticatedBaustellenIndexRoute: AuthenticatedBaustellenIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
