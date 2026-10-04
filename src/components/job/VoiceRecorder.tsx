@@ -64,7 +64,7 @@ export function VoiceRecorder({ onSave, onCancel }: { onSave: (audio: Blob | nul
           let fin = "";
           let tmp = "";
           for (let i = e.resultIndex; i < e.results.length; i++) {
-            const res = e.results[i];
+            const res = e.results[i]!;
             if (res.isFinal) fin += res[0].transcript + " ";
             else tmp += res[0].transcript;
           }
