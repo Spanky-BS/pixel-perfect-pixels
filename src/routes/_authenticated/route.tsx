@@ -14,7 +14,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 const tabs = [
   { to: "/uebersicht", label: "Übersicht", icon: Home },
-  { to: "/baustellen", label: "Baustellen", icon: HardHat },
+  { to: "/baustellen", label: "Aufträge", icon: HardHat },
   { to: "/kunden", label: "Kunden", icon: Users },
   { to: "/einstellungen", label: "Einstellungen", icon: Settings },
 ] as const;

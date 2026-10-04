@@ -138,7 +138,11 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
               <div className="mt-1 text-sm text-muted-foreground">{[m.preferred_brand, m.dimensions, m.finish].filter(Boolean).join(" · ")}</div>
             )}
             {m.notes && <div className="mt-1 text-sm text-muted-foreground">{m.notes}</div>}
+            {m.confidence && <div className="mt-1 text-[11px] font-semibold text-muted-foreground">KI-Vorschlag · Sicherheit: {m.confidence}</div>}
           </button>
+          {m.status === "Produkt suchen" && (
+            <button onClick={() => toast.info("Produktsuche folgt mit der Lieferantenanbindung (Richner).")} className="mt-2 h-10 w-full rounded-lg border border-primary text-sm font-semibold text-primary">Produkt finden</button>
+          )}
           <div className="mt-2 flex justify-end gap-1 border-t pt-2">
             <IconBtn label="Nach oben" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp className="h-4 w-4" /></IconBtn>
             <IconBtn label="Nach unten" onClick={() => move(i, 1)} disabled={i === list.length - 1}><ArrowDown className="h-4 w-4" /></IconBtn>
