@@ -223,7 +223,7 @@ export function useCaptureSheets(jobId: string) {
   return { openVoice: () => setVoiceOpen(true), openText: () => setTextOpen(true), sheets };
 }
 
-export function HiddenFileInputs({ onFiles }: { onFiles: (f: FileList | null) => void }) {
+export function useFileInputs({ onFiles }: { onFiles: (f: FileList | null) => void }) {
   const camera = useRef<HTMLInputElement>(null);
   const upload = useRef<HTMLInputElement>(null);
   return {
