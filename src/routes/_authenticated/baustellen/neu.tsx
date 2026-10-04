@@ -75,7 +75,7 @@ function NewJob() {
           street: street || (mode === "new" ? draft.street : null),
           zip: zip || (mode === "new" ? draft.zip : null),
           city: city || (mode === "new" ? draft.city : null),
-          job_type: typ,
+          job_type: service ? "service" : "project",
           ...(service ? { problem_description: notes } : { notes }),
           status: service ? "Neu" : "Begehung",
         })
@@ -141,7 +141,7 @@ function NewJob() {
   );
 }
 
-function TypeChooser({ kunde }: { kunde?: string }) {
+function TypeChooser({ kunde }: { kunde?: string | undefined }) {
   const opts = [
     { typ: "project" as const, icon: HardHat, title: "Projekt / Baustelle", text: "Bestandesaufnahme, Analyse, optionale Grobkostenschätzung, Produktauswahl, Kalkulation, Offerte." },
     { typ: "service" as const, icon: Wrench, title: "Regie / Service", text: "Reparatur oder Service: Auftrag erfassen, effektive Stunden und Material, Abschluss." },
