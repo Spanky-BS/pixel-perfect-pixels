@@ -1,3 +1,5 @@
+import { statusTone } from "@/lib/app";
+
 // Placeholder wordmark until the real company logo is supplied.
 export function Brand({ large = false }: { large?: boolean }) {
   return (
@@ -18,5 +20,18 @@ export function Brand({ large = false }: { large?: boolean }) {
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  return null as unknown as JSX.Element;
+  return (
+    <span className={`inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold ${statusTone[status] ?? "bg-muted"}`}>
+      {status}
+    </span>
+  );
+}
+
+export function PageHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      {action}
+    </div>
+  );
 }
