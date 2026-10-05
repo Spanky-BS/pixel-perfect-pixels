@@ -1174,13 +1174,19 @@ export type Database = {
       }
       supplier_products: {
         Row: {
+          availability: string | null
+          category: string | null
           created_at: string
           delivery_date: string | null
+          description: string | null
+          gross_price: number | null
           id: string
           image_url: string | null
+          last_updated: string
           manufacturer: string | null
           manufacturer_article_no: string | null
           name: string | null
+          product_url: string | null
           purchase_price: number | null
           stock: number | null
           supplier_article_no: string | null
@@ -1188,13 +1194,19 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          availability?: string | null
+          category?: string | null
           created_at?: string
           delivery_date?: string | null
+          description?: string | null
+          gross_price?: number | null
           id?: string
           image_url?: string | null
+          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
+          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -1202,13 +1214,19 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          availability?: string | null
+          category?: string | null
           created_at?: string
           delivery_date?: string | null
+          description?: string | null
+          gross_price?: number | null
           id?: string
           image_url?: string | null
+          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
+          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -1224,6 +1242,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supplier_sessions: {
+        Row: {
+          created_at: string
+          encrypted_payload: string
+          expires_at: string | null
+          id: string
+          supplier_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_payload: string
+          expires_at?: string | null
+          id?: string
+          supplier_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_payload?: string
+          expires_at?: string | null
+          id?: string
+          supplier_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       suppliers: {
         Row: {
