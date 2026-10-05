@@ -74,14 +74,19 @@ ALTER TABLE public.supplier_invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_price_history ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "own supplier invoices" ON public.supplier_invoices;
+DROP POLICY IF EXISTS "own supplier invoices" ON public.supplier_invoices;
 CREATE POLICY "own supplier invoices" ON public.supplier_invoices FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 DROP POLICY IF EXISTS "own invoice items" ON public.supplier_invoice_items;
+DROP POLICY IF EXISTS "own invoice items" ON public.supplier_invoice_items;
 CREATE POLICY "own invoice items" ON public.supplier_invoice_items FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "own price history" ON public.product_price_history;
 DROP POLICY IF EXISTS "own price history" ON public.product_price_history;
 CREATE POLICY "own price history" ON public.product_price_history FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 DROP TRIGGER IF EXISTS t_supplier_invoices ON public.supplier_invoices;
+DROP TRIGGER IF EXISTS t_supplier_invoices ON public.supplier_invoices;
 CREATE TRIGGER t_supplier_invoices BEFORE UPDATE ON public.supplier_invoices FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
+DROP TRIGGER IF EXISTS tj_supplier_invoices ON public.supplier_invoices;
 DROP TRIGGER IF EXISTS tj_supplier_invoices ON public.supplier_invoices;
 CREATE TRIGGER tj_supplier_invoices AFTER INSERT OR UPDATE OR DELETE ON public.supplier_invoices FOR EACH ROW EXECUTE FUNCTION public.touch_job();
 
