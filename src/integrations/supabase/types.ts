@@ -221,47 +221,6 @@ export type Database = {
         }
         Relationships: []
       }
-      job_photos: {
-        Row: {
-          category: string | null
-          created_at: string
-          description: string | null
-          id: string
-          job_id: string
-          storage_path: string
-          taken_at: string
-          user_id: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          job_id: string
-          storage_path: string
-          taken_at?: string
-          user_id?: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          job_id?: string
-          storage_path?: string
-          taken_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "job_photos_job_id_fkey"
-            columns: ["job_id"]
-            isOneToOne: false
-            referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       job_documents: {
         Row: {
           created_at: string
@@ -299,6 +258,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "job_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_photos: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          job_id: string
+          storage_path: string
+          taken_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id: string
+          storage_path: string
+          taken_at?: string
+          user_id?: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          job_id?: string
+          storage_path?: string
+          taken_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_photos_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
@@ -539,17 +539,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "material_requirements_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "material_requirements_job_id_fkey"
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requirements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -626,7 +626,22 @@ export type Database = {
           supplier_name?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_price_history_supplier_invoice_id_fkey"
+            columns: ["supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
@@ -635,13 +650,13 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          last_purchase_date: string | null
           manufacturer: string | null
           manufacturer_article_no: string | null
           markup: number | null
           name: string
           notes: string | null
           purchase_price: number | null
-          last_purchase_date: string | null
           sales_price: number | null
           source: string
           supplier_article_no: string | null
@@ -1056,7 +1071,29 @@ export type Database = {
           unit_price?: number | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoice_items_matched_product_id_fkey"
+            columns: ["matched_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoice_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_invoices: {
         Row: {
@@ -1125,23 +1162,25 @@ export type Database = {
           user_id?: string
           vat_amount?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_products: {
         Row: {
-          availability: string | null
-          category: string | null
           created_at: string
           delivery_date: string | null
-          description: string | null
-          gross_price: number | null
           id: string
           image_url: string | null
-          last_updated: string
           manufacturer: string | null
           manufacturer_article_no: string | null
           name: string | null
-          product_url: string | null
           purchase_price: number | null
           stock: number | null
           supplier_article_no: string | null
@@ -1149,19 +1188,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          availability?: string | null
-          category?: string | null
           created_at?: string
           delivery_date?: string | null
-          description?: string | null
-          gross_price?: number | null
           id?: string
           image_url?: string | null
-          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
-          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -1169,19 +1202,13 @@ export type Database = {
           user_id?: string
         }
         Update: {
-          availability?: string | null
-          category?: string | null
           created_at?: string
           delivery_date?: string | null
-          description?: string | null
-          gross_price?: number | null
           id?: string
           image_url?: string | null
-          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
-          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -1224,36 +1251,6 @@ export type Database = {
           name?: string
           preferred?: boolean
           priority?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
-      supplier_sessions: {
-        Row: {
-          created_at: string
-          encrypted_payload: string
-          expires_at: string | null
-          id: string
-          supplier_key: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          encrypted_payload: string
-          expires_at?: string | null
-          id?: string
-          supplier_key: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          encrypted_payload?: string
-          expires_at?: string | null
-          id?: string
-          supplier_key?: string
-          updated_at?: string
           user_id?: string
         }
         Relationships: []
