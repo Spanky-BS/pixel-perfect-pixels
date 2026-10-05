@@ -17,7 +17,7 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
     <Link
       to="/baustellen/$id"
       params={{ id: job.id }}
-      className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-sm active:bg-accent"
+      className="surface flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
     >
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center justify-between gap-2">

@@ -40,30 +40,32 @@ export function StatusStepper({
         <span>Schritt {viewIdx + 1} von {steps.length}</span>
         <span className="font-semibold text-foreground">{stepLabel(type, steps[viewIdx] ?? view)}</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div className="h-full bg-primary" style={{ width: `${((persistedIdx + 1) / steps.length) * 100}%` }} />
+      <div className="flex gap-1">
+        {steps.map((s, i) => (
+          <div key={s} className={`h-1.5 flex-1 rounded-full ${i <= persistedIdx ? "bg-primary" : "bg-muted"}`} />
+        ))}
       </div>
-      <div ref={ref} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1">
+      <div ref={ref} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
         {steps.map((s, i) => {
           const done = i < persistedIdx;
           const viewing = i === viewIdx;
           const current = i === persistedIdx;
           const activeStyle = current && viewing
-            ? "border-primary bg-primary text-primary-foreground"
+            ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
             : viewing
-              ? "border-primary bg-card text-primary ring-1 ring-primary"
+              ? "bg-card text-primary ring-2 ring-primary"
               : done
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "bg-card text-muted-foreground";
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground";
           return (
             <button
               key={s}
               type="button"
               data-step={i}
               onClick={() => onSelect(s)}
-              className={`flex h-11 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-semibold ${activeStyle}`}
+              className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-transform active:scale-95 ${activeStyle}`}
             >
-              {done && !viewing ? <Check className="h-4 w-4" /> : <span className="font-mono text-xs">{i + 1}</span>}
+              {done && !viewing ? <Check className="h-4 w-4" /> : <span className="text-xs opacity-70">{i + 1}</span>}
               {stepLabel(type, s)}
             </button>
           );
@@ -73,7 +75,7 @@ export function StatusStepper({
         <button
           type="button"
           onClick={() => onAdvance(next)}
-          className="h-11 w-full rounded-lg border border-primary text-sm font-semibold text-primary active:bg-primary/10"
+          className="action-tile-primary min-h-0 h-12 w-full flex-row text-base"
         >
           Weiter zu «{stepLabel(type, next)}» →
         </button>
