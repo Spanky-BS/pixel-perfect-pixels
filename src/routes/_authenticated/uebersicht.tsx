@@ -37,13 +37,11 @@ function Dashboard() {
     );
   }, [q, all]);
 
-  const hour = new Date().getHours();
-  const greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm font-medium text-muted-foreground">{new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long" })}</p>
-        <h1 className="text-3xl font-bold tracking-tight">{greet}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Guete Morge Timo</h1>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Link to="/baustellen/neu" search={{ typ: "project" }} className="action-tile-primary min-h-28 items-start justify-between p-4 text-left text-base">
