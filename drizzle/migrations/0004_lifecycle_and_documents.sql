@@ -35,7 +35,9 @@ GRANT ALL ON public.job_documents TO service_role;
 ALTER TABLE public.job_documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "own documents" ON public.job_documents;
+DROP POLICY IF EXISTS "own documents" ON public.job_documents;
 CREATE POLICY "own documents" ON public.job_documents FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
+DROP TRIGGER IF EXISTS tj_documents ON public.job_documents;
 DROP TRIGGER IF EXISTS tj_documents ON public.job_documents;
 CREATE TRIGGER tj_documents AFTER INSERT OR UPDATE OR DELETE ON public.job_documents FOR EACH ROW EXECUTE FUNCTION public.touch_job();

@@ -1,0 +1,1 @@
+COMMENT ON TABLE public.supplier_sessions IS 'Server-only supplier session store; no client access.';
