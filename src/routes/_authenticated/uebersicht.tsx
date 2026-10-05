@@ -37,20 +37,26 @@ function Dashboard() {
     );
   }, [q, all]);
 
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? "Guten Morgen" : hour < 18 ? "Guten Tag" : "Guten Abend";
   return (
     <div className="space-y-6">
+      <div>
+        <p className="text-sm font-medium text-muted-foreground">{new Date().toLocaleDateString("de-CH", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <h1 className="text-3xl font-bold tracking-tight">{greet}</h1>
+      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Link to="/baustellen/neu" search={{ typ: "project" }} className="flex h-16 items-center justify-center gap-2 rounded-xl bg-primary px-2 text-base font-semibold text-primary-foreground shadow-sm active:opacity-90">
-          <Plus className="h-5 w-5" /> Neues Projekt
+        <Link to="/baustellen/neu" search={{ typ: "project" }} className="action-tile-primary min-h-28 items-start justify-between p-4 text-left text-base">
+          <Plus className="h-6 w-6" /> <span>Neues Projekt</span>
         </Link>
-        <Link to="/baustellen/neu" search={{ typ: "service" }} className="flex h-16 items-center justify-center gap-2 rounded-xl border-2 border-primary bg-card px-2 text-base font-semibold text-primary active:opacity-90">
-          <Plus className="h-5 w-5" /> Neuer Regieauftrag
+        <Link to="/baustellen/neu" search={{ typ: "service" }} className="action-tile min-h-28 items-start justify-between p-4 text-left text-base text-primary">
+          <Plus className="h-6 w-6" /> <span>Neuer Regieauftrag</span>
         </Link>
       </div>
 
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Auftrag oder Kunde suchen" className="h-12 bg-card pl-10 text-base" />
+        <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Auftrag oder Kunde suchen" className="h-12 rounded-2xl border-0 bg-card pl-11 text-base shadow-[var(--shadow-card)]" />
       </div>
 
       {results ? (
@@ -94,7 +100,7 @@ function Dashboard() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="surface p-4">
       <div className="font-mono text-2xl font-medium text-primary">{value}</div>
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
     </div>

@@ -50,8 +50,12 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.975 0.004 250);
+  --radius: 0.875rem;
+  --background: oklch(0.965 0.006 250);
+  --primary-glow: oklch(0.45 0.12 255);
+  --gradient-primary: linear-gradient(140deg, var(--primary-glow), var(--primary));
+  --shadow-card: 0 1px 2px oklch(0.2 0.03 255 / 0.05), 0 4px 16px -6px oklch(0.2 0.03 255 / 0.1);
+  --shadow-primary: 0 8px 20px -8px oklch(0.34 0.1 258 / 0.55);
   --foreground: oklch(0.2 0.03 255);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.2 0.03 255);
@@ -110,15 +114,22 @@
 
 @layer components {
   .action-tile {
-    @apply flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border bg-card p-3 text-center text-sm font-semibold text-foreground shadow-sm active:bg-accent;
+    @apply flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl bg-card p-3 text-center text-sm font-semibold text-foreground transition-transform active:scale-[0.97];
+    box-shadow: var(--shadow-card);
   }
   .action-tile-primary {
-    @apply flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl bg-primary p-3 text-center text-sm font-semibold text-primary-foreground shadow-sm active:opacity-90;
+    @apply flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl p-3 text-center text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.97];
+    background: var(--gradient-primary);
+    box-shadow: var(--shadow-primary);
+  }
+  .surface {
+    @apply rounded-2xl bg-card;
+    box-shadow: var(--shadow-card);
   }
   .field-label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-muted-foreground;
   }
   .section-title {
-    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+    @apply text-[13px] font-semibold tracking-tight text-foreground/70;
   }
 }
