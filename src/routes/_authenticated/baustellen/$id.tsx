@@ -1,23 +1,30 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, ImagePlus, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft } from "lucide-react";
+import { Camera, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft, MoreHorizontal, FileUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/CustomerForm";
-import { NotesList, PhotoGallery, useCaptureSheets, useFileInputs, usePhotoUpload } from "@/components/job/CaptureSection";
+import { DocumentList, NotesList, PhotoAssignSheet, PhotoGallery, SourceFilesSheet, classifyUpload, useCaptureSheets, useDocumentUpload, useFileInputs, usePhotoUpload } from "@/components/job/CaptureSection";
 import { MaterialEditor, MaterialList, useMaterials } from "@/components/job/MaterialList";
 import { LabourEditor, LabourList, useLabour } from "@/components/job/LabourList";
 import { settingsQuery } from "@/lib/queries";
 import { StatusStepper } from "@/components/job/StatusStepper";
 import { AiAnalysis, OpenQuestions } from "@/components/job/AiAnalysis";
 import { CostEstimate } from "@/components/job/CostEstimate";
-import { Kalkulation } from "@/components/job/Kalkulation";
-import { ServiceCompletion, ServiceLabour, ServiceMaterial, ServiceOrder } from "@/components/job/ServiceSections";
-import { JOB_TYPE_LABEL, address, customerName, formatDate, type Labour, type Material } from "@/lib/app";
+import { Kalkulation, Row } from "@/components/job/Kalkulation";
+import { Nachkalkulation } from "@/components/job/Nachkalkulation";
+import { SupplierInvoices } from "@/components/job/SupplierInvoices";
+import { ServiceJobView } from "@/components/job/ServiceJob";
+import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Labour, type Material } from "@/lib/app";
+import { StatusBadge } from "@/components/Brand";
+import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
+import { unitSalesPrice } from "@/lib/products";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/baustellen/$id")({
   head: () => ({
@@ -31,18 +38,18 @@ export const Route = createFileRoute("/_authenticated/baustellen/$id")({
   component: JobPage,
 });
 
-type Tab = "aufnahme" | "material" | "arbeit" | "kalkulation" | "details" | "auftrag" | "fotos" | "abschluss";
-
 function JobPage() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab | null>(null);
+  const [selectedWorkflowStep, setSelectedWorkflowStep] = useState<string | null>(null);
   const [mat, setMat] = useState<(Partial<Material> & { job_id: string }) | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [assignPhotoIds, setAssignPhotoIds] = useState<string[]>([]);
   const [lab, setLab] = useState<(Partial<Labour> & { job_id: string }) | null>(null);
   const settings = useQuery(settingsQuery());
-  const materials = useMaterials(id);
-  const labour = useLabour(id);
 
   const job = useQuery({
     queryKey: ["job", id],
@@ -52,9 +59,29 @@ function JobPage() {
       return data;
     },
   });
+  const jobTypeRef = useRef(job.data?.job_type);
+  jobTypeRef.current = job.data?.job_type;
 
-  const upload = usePhotoUpload(id);
-  const files = useFileInputs({ onFiles: upload });
+  const photos = usePhotoUpload(id, {
+    defaultCategory: job.data?.job_type === "service" ? DEFAULT_SERVICE_PHOTO_CATEGORY : null,
+    onUploaded: (ids) => {
+      if (jobTypeRef.current === "service") setAssignPhotoIds(ids);
+    },
+  });
+  const documents = useDocumentUpload(id);
+  async function onDocuments(list: FileList | null) {
+    if (jobTypeRef.current !== "service") return documents(list);
+    if (!list?.length) return;
+    const images = Array.from(list).filter((f) => classifyUpload(f) === "Bild");
+    const rest = Array.from(list).filter((f) => classifyUpload(f) !== "Bild");
+    if (images.length) await photos(images);
+    if (rest.length) {
+      const dt = new DataTransfer();
+      rest.forEach((f) => dt.items.add(f));
+      await documents(dt.files);
+    }
+  }
+  const files = useFileInputs({ onCamera: photos, onDocuments });
   const capture = useCaptureSheets(id);
 
   async function setStatus(status: string) {
@@ -69,14 +96,11 @@ function JobPage() {
   const j = job.data;
   const c = j.customers;
   const service = j.job_type === "service";
-  const cur: Tab = tab ?? (service ? "auftrag" : "aufnahme");
+  const persisted = normalizeStatus(j.job_type, j.status);
+  const viewStep = selectedWorkflowStep ?? persisted;
 
-  const addMaterial = () => { setMat({ job_id: id, quantity: 1, unit: "Stk", status: "Offen" }); setTab("material"); };
-  const addLabour = () => { setLab({ job_id: id, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) }); setTab("arbeit"); };
-
-  const tabs: [Tab, string][] = service
-    ? [["auftrag", "Auftrag"], ["arbeit", "Arbeit"], ["material", "Material"], ["fotos", "Fotos"], ["abschluss", "Abschluss"]]
-    : [["aufnahme", "Aufnahme"], ["material", `Material${materials.data?.length ? ` (${materials.data.length})` : ""}`], ["arbeit", `Arbeit${labour.data?.length ? ` (${labour.data.length})` : ""}`], ["kalkulation", "Kalkulation"], ["details", "Details"]];
+  const addMaterial = () => { setMat({ job_id: id, quantity: 1, unit: "Stk", status: "Offen" }); };
+  const addLabour = () => { setLab({ job_id: id, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) }); };
 
   const captureTiles = (
     <>
@@ -85,11 +109,13 @@ function JobPage() {
         <button className="action-tile-primary" onClick={capture.openVoice}><Mic className="h-7 w-7" />Sprache</button>
         <button className="action-tile-primary" onClick={capture.openText}><FileText className="h-7 w-7" />Text</button>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <SecBtn onClick={files.openUpload} icon={<ImagePlus className="h-4 w-4" />}>Foto hochladen</SecBtn>
-        {!service && <SecBtn onClick={addMaterial} icon={<Package className="h-4 w-4" />}>Material manuell</SecBtn>}
-        {!service && <SecBtn onClick={addLabour} icon={<Wrench className="h-4 w-4" />}>Arbeit manuell</SecBtn>}
-      </div>
+      {!service && (
+        <div className="grid grid-cols-3 gap-2">
+          <SecBtn onClick={files.openUpload} icon={<FileUp className="h-4 w-4" />}>Datei / Unterlage hochladen</SecBtn>
+          <SecBtn onClick={addMaterial} icon={<Package className="h-4 w-4" />}>Material manuell</SecBtn>
+          <SecBtn onClick={addLabour} icon={<Wrench className="h-4 w-4" />}>Arbeit manuell</SecBtn>
+        </div>
+      )}
     </>
   );
 
@@ -103,7 +129,36 @@ function JobPage() {
           <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {c ? <Link to="/kunden/$id" params={{ id: c.id }} className="text-primary">{customerName(c)}</Link> : "Ohne Kunde"}
           </span>
-          <span className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold uppercase ${service ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{JOB_TYPE_LABEL[service ? "service" : "project"]}</span>
+          <div className="flex shrink-0 items-center gap-1">
+            <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase ${service ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{JOB_TYPE_LABEL[service ? "service" : "project"]}</span>
+            {service && <StatusBadge status={displayServiceStatus(j.status)} />}
+            {isActiveJob(j) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" aria-label="Weitere Aktionen" className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="text-destructive" onClick={() => setCancelOpen(true)}>
+                    {service ? "Auftrag absagen" : "Projekt absagen"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={async () => {
+                      if (!confirm("Auftrag inkl. aller Fotos, Notizen und Positionen löschen?")) return;
+                      const { error } = await supabase.from("jobs").delete().eq("id", id);
+                      if (error) return toast.error(error.message);
+                      qc.invalidateQueries({ queryKey: ["jobs"] });
+                      navigate({ to: "/baustellen" });
+                    }}
+                  >
+                    Auftrag löschen
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
         </div>
         <div>
           <h1 className="text-xl font-bold leading-tight">{j.title}</h1>
@@ -116,84 +171,336 @@ function JobPage() {
             <a href={`tel:${c.phone}`} className="mt-1 flex items-center gap-1 text-sm font-medium text-primary"><Phone className="h-4 w-4" /> {c.phone}</a>
           )}
         </div>
-        <StatusStepper type={j.job_type} status={j.status} onChange={setStatus} />
-        <div className="text-xs text-muted-foreground">
-          Erstellt {formatDate(j.created_at)} · Bearbeitet {formatDate(j.updated_at, true)}
-          {j.appointment_at && <> · Termin {formatDate(j.appointment_at, true)}</>}
-        </div>
-        {j.internal_notes && <p className="rounded-lg bg-muted px-3 py-2 text-sm"><span className="font-semibold">Intern: </span>{j.internal_notes}</p>}
+        {!service && (
+          <StatusStepper
+            type={j.job_type}
+            status={j.status}
+            selected={viewStep}
+            onSelect={setSelectedWorkflowStep}
+            onAdvance={(s) => {
+              if (s === "Abgeschlossen") return;
+              setStatus(s);
+              setSelectedWorkflowStep(s);
+            }}
+          />
+        )}
+        {service && j.appointment_at && (
+          <p className="text-sm text-muted-foreground">Termin {formatDate(j.appointment_at, true)}</p>
+        )}
+        {!service && !isActiveJob(j) && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-sm font-semibold">
+            {lifecycleLabel(lifecycleOf(j))}
+            {j.cancellation_reason ? ` – ${j.cancellation_reason}` : ""}
+            {lifecycleOf(j) === "completed" && j.completed_at ? ` · ${formatDate(j.completed_at, true)}` : ""}
+            {lifecycleOf(j) === "cancelled" && j.cancelled_at ? ` · ${formatDate(j.cancelled_at, true)}` : ""}
+          </p>
+        )}
+        {!service && (
+          <div className="text-xs text-muted-foreground">
+            Erstellt {formatDate(j.created_at)} · Bearbeitet {formatDate(j.updated_at, true)}
+            {j.appointment_at && <> · Termin {formatDate(j.appointment_at, true)}</>}
+          </div>
+        )}
+        {!service && j.internal_notes && <p className="rounded-lg bg-muted px-3 py-2 text-sm"><span className="font-semibold">Intern: </span>{j.internal_notes}</p>}
       </div>
       {files.inputs}
       {capture.sheets}
+      {service && (
+        <PhotoAssignSheet key={assignPhotoIds.join(",")} jobId={id} photoIds={assignPhotoIds} onClose={() => setAssignPhotoIds([])} />
+      )}
 
-      <div className="sticky top-14 z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
-        <div className="flex gap-1 overflow-x-auto rounded-lg bg-muted p-1">
-          {tabs.map(([k, l]) => (
-            <button key={k} onClick={() => setTab(k)} className={`h-10 min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-md px-2 text-xs font-semibold ${cur === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>{l}</button>
-          ))}
-        </div>
-      </div>
+      {!service && (
+        <ProjectStepContent
+          step={viewStep}
+          job={j}
+          jobId={id}
+          captureTiles={captureTiles}
+          onAddMaterial={addMaterial}
+          onAddLabour={addLabour}
+          onEditMaterial={setMat}
+          onEditLabour={setLab}
+          onViewSources={() => setSourcesOpen(true)}
+          onAddPhoto={files.openCamera}
+          onComplete={async () => {
+            if (!confirm("Projekt wirklich abschliessen? Es erscheint danach im Archiv.")) return;
+            try {
+              await completeJob(id);
+              toast.success("Projekt abgeschlossen");
+              qc.invalidateQueries({ queryKey: ["job", id] });
+              qc.invalidateQueries({ queryKey: ["jobs"] });
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Abschliessen fehlgeschlagen");
+            }
+          }}
+          onDeleted={() => navigate({ to: "/baustellen" })}
+        />
+      )}
 
-      {cur === "aufnahme" && (
-        <div className="space-y-6">
-          <div className="space-y-2">{captureTiles}</div>
-          <AiAnalysis jobId={id} onEditMaterial={setMat} onEditLabour={setLab} />
-          <OpenQuestions jobId={id} />
-          <PhotoGallery jobId={id} />
-          <NotesList jobId={id} />
-        </div>
+      {service && (
+        <ServiceJobView
+          job={j}
+          onUpload={files.openUpload}
+          onCamera={files.openCamera}
+          onVoice={capture.openVoice}
+          onText={capture.openText}
+          onPhotoFiles={photos}
+          onDeleted={() => navigate({ to: "/baustellen" })}
+        />
       )}
-      {cur === "material" && !service && (
-        <div className="space-y-3">
-          <MaterialList jobId={id} onEdit={setMat} />
-          <Button variant="outline" className="h-12 w-full" onClick={addMaterial}>+ Material hinzufügen</Button>
-        </div>
-      )}
-      {cur === "arbeit" && !service && (
-        <div className="space-y-3">
-          <LabourList jobId={id} onEdit={setLab} />
-          <Button variant="outline" className="h-12 w-full" onClick={addLabour}>+ Arbeitsleistung hinzufügen</Button>
-        </div>
-      )}
-      {cur === "kalkulation" && (
-        <div className="space-y-6">
-          <section className="space-y-2">
-            <h2 className="section-title">Grobkostenschätzung (optional)</h2>
-            <CostEstimate jobId={id} />
-          </section>
-          <section className="space-y-2">
-            <h2 className="section-title">Detailkalkulation</h2>
-            <Kalkulation jobId={id} />
-          </section>
-        </div>
-      )}
-      {cur === "details" && <JobDetails job={j} onDeleted={() => navigate({ to: "/baustellen" })} />}
-
-      {cur === "auftrag" && (
-        <div className="space-y-6">
-          <div className="space-y-2">{captureTiles}</div>
-          <ServiceOrder job={j} />
-          <NotesList jobId={id} />
-          <JobDetails job={j} onDeleted={() => navigate({ to: "/baustellen" })} />
-        </div>
-      )}
-      {cur === "arbeit" && service && <ServiceLabour jobId={id} />}
-      {cur === "material" && service && <ServiceMaterial jobId={id} />}
-      {cur === "fotos" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <button className="action-tile-primary" onClick={files.openCamera}><Camera className="h-7 w-7" />Foto aufnehmen</button>
-            <button className="action-tile" onClick={files.openUpload}><ImagePlus className="h-6 w-6 text-primary" />Foto hochladen</button>
-          </div>
-          <p className="text-xs text-muted-foreground">Tipp: Kategorie «Vorher» / «Nachher» beim Foto setzen.</p>
-          <PhotoGallery jobId={id} />
-        </div>
-      )}
-      {cur === "abschluss" && <ServiceCompletion job={j} onStatus={setStatus} />}
 
       <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "none"} draft={mat} onClose={() => setMat(null)} />
       <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "none"} draft={lab} onClose={() => setLab(null)} />
+      <SourceFilesSheet jobId={id} open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
+      <Sheet open={cancelOpen} onOpenChange={setCancelOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader><SheetTitle>{service ? "Auftrag absagen" : "Projekt absagen"}</SheetTitle></SheetHeader>
+          <div className="space-y-3 p-4 pt-0">
+            <p className="text-sm text-muted-foreground">{service ? "Der Auftrag wird abgesagt und erscheint im Archiv. Alle Daten bleiben erhalten." : "Kunde hat die Offerte abgelehnt oder das Projekt wird beendet. Alle Daten bleiben im Archiv."}</p>
+            <Field label="Grund (optional)">
+              <Textarea className="min-h-20 text-base" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} placeholder="z.B. Offerte abgelehnt" />
+            </Field>
+            <Button
+              variant="outline"
+              className="h-12 w-full text-destructive"
+              onClick={async () => {
+                if (!confirm(service ? "Auftrag absagen und ins Archiv verschieben?" : "Projekt absagen und ins Archiv verschieben?")) return;
+                try {
+                  await cancelJob(id, cancelReason.trim() || null);
+                  if (service) {
+                    await supabase.from("jobs").update({ status: "Abgesagt" }).eq("id", id);
+                  }
+                  toast.success(service ? "Auftrag abgesagt" : "Projekt abgesagt");
+                  setCancelOpen(false);
+                  qc.invalidateQueries({ queryKey: ["job", id] });
+                  qc.invalidateQueries({ queryKey: ["jobs"] });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Absagen fehlgeschlagen");
+                }
+              }}
+            >
+              Absagen und archivieren
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
+  );
+}
+
+function ProjectStepContent({
+  step,
+  job,
+  jobId,
+  captureTiles,
+  onAddMaterial,
+  onAddLabour,
+  onEditMaterial,
+  onEditLabour,
+  onViewSources,
+  onAddPhoto,
+  onComplete,
+  onDeleted,
+}: {
+  step: string;
+  job: Job & { customers?: { id: string; company_name: string | null; first_name: string | null; last_name: string | null } | null };
+  jobId: string;
+  captureTiles: React.ReactNode;
+  onAddMaterial: () => void;
+  onAddLabour: () => void;
+  onEditMaterial: (d: Partial<Material> & { job_id: string }) => void;
+  onEditLabour: (d: Partial<Labour> & { job_id: string }) => void;
+  onViewSources: () => void;
+  onAddPhoto: () => void;
+  onComplete: () => void;
+  onDeleted: () => void;
+}) {
+  switch (step) {
+    case "Begehung":
+      return (
+        <div className="space-y-6">
+          <div className="space-y-2">{captureTiles}</div>
+          <OpenQuestions jobId={jobId} />
+          <PhotoGallery jobId={jobId} />
+          <DocumentList jobId={jobId} />
+          <NotesList jobId={jobId} />
+          <section className="space-y-3">
+            <h2 className="section-title">Material manuell</h2>
+            <MaterialList jobId={jobId} onEdit={onEditMaterial} />
+            <Button variant="outline" className="h-12 w-full" onClick={onAddMaterial}>+ Material hinzufügen</Button>
+          </section>
+          <section className="space-y-3">
+            <h2 className="section-title">Arbeit manuell</h2>
+            <LabourList jobId={jobId} onEdit={onEditLabour} />
+            <Button variant="outline" className="h-12 w-full" onClick={onAddLabour}>+ Arbeitsleistung hinzufügen</Button>
+          </section>
+        </div>
+      );
+    case "Analyse":
+      return (
+        <div className="space-y-6">
+          <AiAnalysis jobId={jobId} onEditMaterial={onEditMaterial} onEditLabour={onEditLabour} />
+          <OpenQuestions jobId={jobId} />
+        </div>
+      );
+    case "Grobkosten":
+      return (
+        <section className="space-y-2">
+          <h2 className="section-title">Grobkostenschätzung</h2>
+          <CostEstimate jobId={jobId} />
+        </section>
+      );
+    case "Produktauswahl":
+      return (
+        <div className="space-y-3">
+          <h2 className="section-title">Materialanforderungen</h2>
+          <p className="text-sm text-muted-foreground">Was gebraucht wird – danach ein internes Produkt zuordnen oder manuell anlegen.</p>
+          <Button variant="outline" className="h-11 w-full" onClick={onViewSources}>Unterlagen</Button>
+          <MaterialList jobId={jobId} onEdit={onEditMaterial} />
+          <Button variant="outline" className="h-12 w-full" onClick={onAddMaterial}>+ Material hinzufügen</Button>
+        </div>
+      );
+    case "Kalkulation":
+      return <Kalkulation jobId={jobId} />;
+    case "Offerte":
+      return <OffertePlaceholder job={job} jobId={jobId} />;
+    case "Auftrag":
+      return <AuftragPlaceholder job={job} />;
+    case "Ausführung":
+      return (
+        <div className="space-y-4">
+          <p className="rounded-xl border bg-card p-4 text-sm font-semibold">Ausführung wird hier erfasst</p>
+          <section className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 className="section-title">Arbeit</h2>
+            <LabourList jobId={jobId} onEdit={onEditLabour} />
+            <p className="text-xs text-muted-foreground">Ist-Zeiten für die Ausführung folgen. Aktuell: geplante Arbeitspositionen.</p>
+          </section>
+          <section className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 className="section-title">Material</h2>
+            <MaterialList jobId={jobId} onEdit={onEditMaterial} />
+          </section>
+          <section className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 className="section-title">Zusatzkosten</h2>
+            <p className="text-sm text-muted-foreground">Entsorgung, Parkgebühren und weitere Zusatzkosten. Keine separate Fahrzeit – Fahrzeugpauschale nur bei Regie.</p>
+          </section>
+          <section className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 className="section-title">Fotos</h2>
+            <Button type="button" variant="outline" className="h-12 w-full" onClick={onAddPhoto}>
+              <Camera className="h-4 w-4" /> Foto
+            </Button>
+            <PhotoGallery jobId={jobId} />
+          </section>
+        </div>
+      );
+    case "Rechnung":
+      return <AbrechnungPlaceholder jobId={jobId} />;
+    case "Abgeschlossen":
+      return (
+        <div className="space-y-4">
+          <section className="space-y-2 rounded-xl border bg-card p-4">
+            <h2 className="section-title">Abschluss</h2>
+            <p className="text-sm text-muted-foreground">Ansicht – das Projekt ist erst abgeschlossen, wenn Sie unten bestätigen.</p>
+            <Row label="Projekt" value={job.title} />
+            <Row label="Kunde" value={customerName(job.customers)} />
+            <Row label="Adresse" value={address(job) || "–"} />
+            <Row label="Workflow" value={job.status} />
+            <Row label="Lebenszyklus" value={lifecycleLabel(lifecycleOf(job))} />
+            {job.completed_at && <Row label="Abgeschlossen" value={formatDate(job.completed_at, true)} />}
+            {job.cancelled_at && <Row label="Abgesagt" value={formatDate(job.cancelled_at, true)} />}
+          </section>
+          {isActiveJob(job) && <CompletionChecklist jobId={jobId} onComplete={onComplete} />}
+          <JobDetails job={job} onDeleted={onDeleted} />
+        </div>
+      );
+    default:
+      return (
+        <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+          Unbekannter Schritt «{step}». Projektstatus: {job.status}
+        </p>
+      );
+  }
+}
+
+function OffertePlaceholder({ job, jobId }: { job: Job; jobId: string }) {
+  const materials = useMaterials(jobId);
+  const labour = useLabour(jobId);
+  const hours = (labour.data ?? []).reduce((s, l) => s + Number(l.hours), 0);
+  return (
+    <div className="space-y-4">
+      <section className="space-y-2 rounded-xl border bg-card p-4">
+        <h2 className="section-title">Offerte</h2>
+        <Row label="Projekt" value={job.title} />
+        <Row label="Materialpositionen" value={String(materials.data?.length ?? 0)} />
+        <Row label="Arbeitsstunden" value={`${hours.toLocaleString("de-CH")} h`} />
+        <p className="pt-2 text-sm text-muted-foreground">Zusammenfassung aus den erfassten Positionen. Versand und Bexio folgen.</p>
+      </section>
+      <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
+        <FileText className="h-4 w-4" /> Offerte in Bexio erstellen (folgt)
+      </button>
+    </div>
+  );
+}
+
+function AuftragPlaceholder({ job }: { job: Job }) {
+  return (
+    <section className="space-y-2 rounded-xl border bg-card p-4">
+      <h2 className="section-title">Auftrag</h2>
+      <Row label="Projekt" value={job.title} />
+      <Row label="Aktueller Status" value={job.status} />
+      {job.appointment_at && <Row label="Termin" value={formatDate(job.appointment_at, true)} />}
+      <p className="pt-2 text-sm text-muted-foreground">Auftragsbestätigung und Bexio-Anbindung folgen. Status nur über «Weiter zu …» oder Abschlussaktionen ändern.</p>
+    </section>
+  );
+}
+
+function AbrechnungPlaceholder({ jobId }: { jobId: string }) {
+  return (
+    <div className="space-y-4">
+      <section className="space-y-2 rounded-xl border bg-card p-4">
+        <h2 className="section-title">Kundenrechnung</h2>
+        <p className="text-sm text-muted-foreground">Rechnung an den Kunden folgt (ohne Bexio).</p>
+        <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
+          <FileText className="h-4 w-4" /> Rechnung in Bexio erstellen (folgt)
+        </button>
+      </section>
+      <SupplierInvoices jobId={jobId} />
+      <Nachkalkulation jobId={jobId} />
+    </div>
+  );
+}
+
+function CompletionChecklist({ jobId, onComplete }: { jobId: string; onComplete: () => void }) {
+  const materials = useMaterials(jobId);
+  const labour = useLabour(jobId);
+  const open = useQuery({
+    queryKey: ["open", jobId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("open_questions").select("id, status").eq("job_id", jobId);
+      if (error) throw error;
+      return data;
+    },
+  });
+  const openCount = (open.data ?? []).filter((o) => o.status === "offen").length;
+  const unpriced = (materials.data ?? []).filter((m) => {
+    const raw = (m as { products?: { purchase_price: number | null; sales_price: number | null; markup: number | null } | { purchase_price: number | null; sales_price: number | null; markup: number | null }[] | null }).products;
+    const p = Array.isArray(raw) ? raw[0] : raw;
+    return !p || unitSalesPrice(p) == null;
+  }).length;
+  const noLabour = !(labour.data ?? []).length;
+  const warnings = [
+    openCount ? `${openCount} offene Punkte vorhanden` : null,
+    unpriced ? `${unpriced} Materialpositionen ohne Preis` : null,
+    noLabour ? "Keine Arbeitszeiten erfasst" : null,
+    "Abrechnung / Rechnung noch nicht in Bexio (folgt)",
+  ].filter(Boolean) as string[];
+  return (
+    <section className="space-y-3 rounded-xl border bg-card p-4">
+      {warnings.length > 0 && (
+        <div className="space-y-1 rounded-lg border border-warning bg-warning/15 p-3 text-sm">
+          {warnings.map((w) => <p key={w}>{w}</p>)}
+        </div>
+      )}
+      <Button className="h-14 w-full text-base font-semibold" onClick={onComplete}>Projekt abschliessen</Button>
+    </section>
   );
 }
 

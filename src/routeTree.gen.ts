@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedArchivRouteImport } from './routes/_authenticated/archiv'
 import { Route as AuthenticatedEinstellungenRouteImport } from './routes/_authenticated/einstellungen'
 import { Route as AuthenticatedUebersichtRouteImport } from './routes/_authenticated/uebersicht'
 import { Route as AuthenticatedBaustellenIndexRouteImport } from './routes/_authenticated/baustellen/index'
@@ -33,6 +34,11 @@ const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedArchivRoute = AuthenticatedArchivRouteImport.update({
+  id: '/archiv',
+  path: '/archiv',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedEinstellungenRoute =
   AuthenticatedEinstellungenRouteImport.update({
@@ -78,6 +84,7 @@ const AuthenticatedKundenIdRoute = AuthenticatedKundenIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/archiv': typeof AuthenticatedArchivRoute
   '/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/uebersicht': typeof AuthenticatedUebersichtRoute
   '/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/archiv': typeof AuthenticatedArchivRoute
   '/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/uebersicht': typeof AuthenticatedUebersichtRoute
   '/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/archiv': typeof AuthenticatedArchivRoute
   '/_authenticated/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/_authenticated/uebersicht': typeof AuthenticatedUebersichtRoute
   '/_authenticated/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
@@ -115,6 +124,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/archiv'
     | '/einstellungen'
     | '/uebersicht'
     | '/baustellen/$id'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/archiv'
     | '/einstellungen'
     | '/uebersicht'
     | '/baustellen/$id'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/archiv'
     | '/_authenticated/einstellungen'
     | '/_authenticated/uebersicht'
     | '/_authenticated/baustellen/$id'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/archiv': {
+      id: '/_authenticated/archiv'
+      path: '/archiv'
+      fullPath: '/archiv'
+      preLoaderRoute: typeof AuthenticatedArchivRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/einstellungen': {
       id: '/_authenticated/einstellungen'
@@ -229,6 +248,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedArchivRoute: typeof AuthenticatedArchivRoute
   AuthenticatedEinstellungenRoute: typeof AuthenticatedEinstellungenRoute
   AuthenticatedUebersichtRoute: typeof AuthenticatedUebersichtRoute
   AuthenticatedBaustellenIdRoute: typeof AuthenticatedBaustellenIdRoute
@@ -239,6 +259,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedArchivRoute: AuthenticatedArchivRoute,
   AuthenticatedEinstellungenRoute: AuthenticatedEinstellungenRoute,
   AuthenticatedUebersichtRoute: AuthenticatedUebersichtRoute,
   AuthenticatedBaustellenIdRoute: AuthenticatedBaustellenIdRoute,

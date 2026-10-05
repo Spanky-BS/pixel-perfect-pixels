@@ -44,3 +44,13 @@ export const settingsQuery = () =>
       return data;
     },
   });
+
+export const productsQuery = () =>
+  queryOptions({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("products").select("*").eq("active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });

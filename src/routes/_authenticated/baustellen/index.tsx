@@ -5,7 +5,8 @@ import { Plus } from "lucide-react";
 import { JobCard } from "@/components/JobCard";
 import { PageHeader } from "@/components/Brand";
 import { customersQuery, jobsQuery } from "@/lib/queries";
-import { PROJECT_STEPS, SERVICE_STEPS, customerName, normalizeStatus } from "@/lib/app";
+import { ACTIVE_PROJECT_STEPS, ACTIVE_SERVICE_STEPS, customerName, normalizeStatus } from "@/lib/app";
+import { isActiveJob } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/_authenticated/baustellen/")({
   head: () => ({
@@ -27,8 +28,9 @@ function JobsPage() {
   const [type, setType] = useState<TypeFilter>("all");
   const [status, setStatus] = useState("Alle");
   const [customer, setCustomer] = useState("");
-  const statuses = type === "service" ? SERVICE_STEPS : type === "project" ? PROJECT_STEPS : [...new Set([...PROJECT_STEPS, ...SERVICE_STEPS])];
+  const statuses = type === "service" ? ACTIVE_SERVICE_STEPS : type === "project" ? ACTIVE_PROJECT_STEPS : [...new Set([...ACTIVE_PROJECT_STEPS, ...ACTIVE_SERVICE_STEPS])];
   const list = (data ?? []).filter((j) =>
+    isActiveJob(j) &&
     (type === "all" || j.job_type === type) &&
     (status === "Alle" || normalizeStatus(j.job_type, j.status) === status) &&
     (!customer || j.customer_id === customer),

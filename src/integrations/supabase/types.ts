@@ -262,9 +262,55 @@ export type Database = {
           },
         ]
       }
+      job_documents: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_name: string
+          file_type: string
+          id: string
+          job_id: string
+          mime_type: string | null
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_type?: string
+          id?: string
+          job_id: string
+          mime_type?: string | null
+          storage_path: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_type?: string
+          id?: string
+          job_id?: string
+          mime_type?: string | null
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_documents_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           appointment_at: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
           city: string | null
           completed_at: string | null
           completion_notes: string | null
@@ -274,6 +320,7 @@ export type Database = {
           id: string
           internal_notes: string | null
           job_type: string
+          lifecycle_status: string
           notes: string | null
           problem_description: string | null
           signature_path: string | null
@@ -287,6 +334,8 @@ export type Database = {
         }
         Insert: {
           appointment_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           city?: string | null
           completed_at?: string | null
           completion_notes?: string | null
@@ -296,6 +345,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           job_type?: string
+          lifecycle_status?: string
           notes?: string | null
           problem_description?: string | null
           signature_path?: string | null
@@ -309,6 +359,8 @@ export type Database = {
         }
         Update: {
           appointment_at?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
           city?: string | null
           completed_at?: string | null
           completion_notes?: string | null
@@ -318,6 +370,7 @@ export type Database = {
           id?: string
           internal_notes?: string | null
           job_type?: string
+          lifecycle_status?: string
           notes?: string | null
           problem_description?: string | null
           signature_path?: string | null
@@ -428,6 +481,7 @@ export type Database = {
           job_id: string
           notes: string | null
           preferred_brand: string | null
+          product_id: string | null
           quantity: number
           sort_order: number
           source: string
@@ -447,6 +501,7 @@ export type Database = {
           job_id: string
           notes?: string | null
           preferred_brand?: string | null
+          product_id?: string | null
           quantity?: number
           sort_order?: number
           source?: string
@@ -466,6 +521,7 @@ export type Database = {
           job_id?: string
           notes?: string | null
           preferred_brand?: string | null
+          product_id?: string | null
           quantity?: number
           sort_order?: number
           source?: string
@@ -480,6 +536,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "material_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_requirements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
           {
@@ -528,6 +591,113 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_price_history: {
+        Row: {
+          created_at: string
+          id: string
+          invoice_date: string | null
+          product_id: string
+          purchase_price: number
+          supplier_invoice_id: string | null
+          supplier_name: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invoice_date?: string | null
+          product_id: string
+          purchase_price: number
+          supplier_invoice_id?: string | null
+          supplier_name?: string | null
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invoice_date?: string | null
+          product_id?: string
+          purchase_price?: number
+          supplier_invoice_id?: string | null
+          supplier_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          manufacturer: string | null
+          manufacturer_article_no: string | null
+          markup: number | null
+          name: string
+          notes: string | null
+          purchase_price: number | null
+          last_purchase_date: string | null
+          sales_price: number | null
+          source: string
+          supplier_article_no: string | null
+          supplier_name: string | null
+          unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_purchase_date?: string | null
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          markup?: number | null
+          name?: string
+          notes?: string | null
+          purchase_price?: number | null
+          sales_price?: number | null
+          source?: string
+          supplier_article_no?: string | null
+          supplier_name?: string | null
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          active?: boolean
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          last_purchase_date?: string | null
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          markup?: number | null
+          name?: string
+          notes?: string | null
+          purchase_price?: number | null
+          sales_price?: number | null
+          source?: string
+          supplier_article_no?: string | null
+          supplier_name?: string | null
+          unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "material_categories"
             referencedColumns: ["id"]
           },
         ]
@@ -777,6 +947,7 @@ export type Database = {
           currency: string
           default_hourly_rate: number
           default_material_markup: number
+          default_technician: string
           estimate_tolerance: number
           service_hourly_rate: number
           small_material_allowance: number
@@ -791,6 +962,7 @@ export type Database = {
           currency?: string
           default_hourly_rate?: number
           default_material_markup?: number
+          default_technician?: string
           estimate_tolerance?: number
           service_hourly_rate?: number
           small_material_allowance?: number
@@ -805,6 +977,7 @@ export type Database = {
           currency?: string
           default_hourly_rate?: number
           default_material_markup?: number
+          default_technician?: string
           estimate_tolerance?: number
           service_hourly_rate?: number
           small_material_allowance?: number
@@ -816,15 +989,159 @@ export type Database = {
         }
         Relationships: []
       }
-      supplier_products: {
+      supplier_invoice_items: {
+        Row: {
+          confidence: string | null
+          created_at: string
+          description: string
+          discount: number | null
+          id: string
+          invoice_id: string
+          manufacturer: string | null
+          manufacturer_article_no: string | null
+          match_kind: string | null
+          matched_product_id: string | null
+          net_total: number | null
+          price_decision: string | null
+          product_id: string | null
+          quantity: number
+          review_status: string
+          sort_order: number
+          supplier_article_no: string | null
+          unit: string
+          unit_price: number | null
+          user_id: string
+        }
+        Insert: {
+          confidence?: string | null
+          created_at?: string
+          description?: string
+          discount?: number | null
+          id?: string
+          invoice_id: string
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          match_kind?: string | null
+          matched_product_id?: string | null
+          net_total?: number | null
+          price_decision?: string | null
+          product_id?: string | null
+          quantity?: number
+          review_status?: string
+          sort_order?: number
+          supplier_article_no?: string | null
+          unit?: string
+          unit_price?: number | null
+          user_id?: string
+        }
+        Update: {
+          confidence?: string | null
+          created_at?: string
+          description?: string
+          discount?: number | null
+          id?: string
+          invoice_id?: string
+          manufacturer?: string | null
+          manufacturer_article_no?: string | null
+          match_kind?: string | null
+          matched_product_id?: string | null
+          net_total?: number | null
+          price_decision?: string | null
+          product_id?: string | null
+          quantity?: number
+          review_status?: string
+          sort_order?: number
+          supplier_article_no?: string | null
+          unit?: string
+          unit_price?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      supplier_invoices: {
         Row: {
           created_at: string
+          currency: string
+          extraction_confidence: string | null
+          extraction_status: string
+          file_name: string
+          file_type: string
+          gross_total: number | null
+          id: string
+          included_in_costs: boolean
+          invoice_date: string | null
+          invoice_number: string | null
+          job_id: string
+          net_total: number | null
+          notes: string | null
+          review_status: string
+          storage_path: string
+          supplier_name: string | null
+          updated_at: string
+          user_id: string
+          vat_amount: number | null
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          extraction_confidence?: string | null
+          extraction_status?: string
+          file_name?: string
+          file_type?: string
+          gross_total?: number | null
+          id?: string
+          included_in_costs?: boolean
+          invoice_date?: string | null
+          invoice_number?: string | null
+          job_id: string
+          net_total?: number | null
+          notes?: string | null
+          review_status?: string
+          storage_path: string
+          supplier_name?: string | null
+          updated_at?: string
+          user_id?: string
+          vat_amount?: number | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          extraction_confidence?: string | null
+          extraction_status?: string
+          file_name?: string
+          file_type?: string
+          gross_total?: number | null
+          id?: string
+          included_in_costs?: boolean
+          invoice_date?: string | null
+          invoice_number?: string | null
+          job_id?: string
+          net_total?: number | null
+          notes?: string | null
+          review_status?: string
+          storage_path?: string
+          supplier_name?: string | null
+          updated_at?: string
+          user_id?: string
+          vat_amount?: number | null
+        }
+        Relationships: []
+      }
+      supplier_products: {
+        Row: {
+          availability: string | null
+          category: string | null
+          created_at: string
           delivery_date: string | null
+          description: string | null
+          gross_price: number | null
           id: string
           image_url: string | null
+          last_updated: string
           manufacturer: string | null
           manufacturer_article_no: string | null
           name: string | null
+          product_url: string | null
           purchase_price: number | null
           stock: number | null
           supplier_article_no: string | null
@@ -832,13 +1149,19 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          availability?: string | null
+          category?: string | null
           created_at?: string
           delivery_date?: string | null
+          description?: string | null
+          gross_price?: number | null
           id?: string
           image_url?: string | null
+          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
+          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -846,13 +1169,19 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          availability?: string | null
+          category?: string | null
           created_at?: string
           delivery_date?: string | null
+          description?: string | null
+          gross_price?: number | null
           id?: string
           image_url?: string | null
+          last_updated?: string
           manufacturer?: string | null
           manufacturer_article_no?: string | null
           name?: string | null
+          product_url?: string | null
           purchase_price?: number | null
           stock?: number | null
           supplier_article_no?: string | null
@@ -895,6 +1224,36 @@ export type Database = {
           name?: string
           preferred?: boolean
           priority?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      supplier_sessions: {
+        Row: {
+          created_at: string
+          encrypted_payload: string
+          expires_at: string | null
+          id: string
+          supplier_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_payload: string
+          expires_at?: string | null
+          id?: string
+          supplier_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_payload?: string
+          expires_at?: string | null
+          id?: string
+          supplier_key?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

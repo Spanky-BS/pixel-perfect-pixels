@@ -1,5 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
-import { Home, HardHat, Users, Settings } from "lucide-react";
+import { Home, HardHat, Users, Settings, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Brand } from "@/components/Brand";
 
@@ -16,6 +16,7 @@ const tabs = [
   { to: "/uebersicht", label: "Übersicht", icon: Home },
   { to: "/baustellen", label: "Aufträge", icon: HardHat },
   { to: "/kunden", label: "Kunden", icon: Users },
+  { to: "/archiv", label: "Archiv", icon: Archive },
   { to: "/einstellungen", label: "Einstellungen", icon: Settings },
 ] as const;
 
@@ -33,12 +34,12 @@ function Layout() {
         <Outlet />
       </main>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-card pb-safe">
-        <div className="mx-auto grid max-w-2xl grid-cols-4">
+        <div className="mx-auto grid max-w-2xl grid-cols-5">
           {tabs.map((t) => (
             <Link
               key={t.to}
               to={t.to}
-              className="flex h-16 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground"
+              className="flex h-16 flex-col items-center justify-center gap-0.5 px-1 text-[10px] font-medium text-muted-foreground"
               activeProps={{ className: "text-primary" }}
             >
               <t.icon className="h-6 w-6" strokeWidth={2} />

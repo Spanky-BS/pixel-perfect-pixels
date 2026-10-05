@@ -77,7 +77,7 @@ function NewJob() {
           city: city || (mode === "new" ? draft.city : null),
           job_type: service ? "service" : "project",
           ...(service ? { problem_description: notes } : { notes }),
-          status: service ? "Neu" : "Begehung",
+          status: service ? "Offen" : "Begehung",
         })
         .select("id")
         .single();

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export type Customer = Tables<"customers">;
 export type Job = Tables<"jobs">;
 export type JobPhoto = Tables<"job_photos">;
+export type JobDocument = Tables<"job_documents">;
 export type VoiceNote = Tables<"voice_notes">;
 export type Category = Tables<"material_categories">;
 export type Material = Tables<"material_requirements">;
@@ -11,9 +12,21 @@ export type Labour = Tables<"labour_items">;
 export type Settings = Tables<"settings">;
 
 export const JOB_STATUSES = ["Neu", "Aufnahme", "Materialauswahl", "Offerte", "Auftrag", "Abgeschlossen"] as const;
-export const MATERIAL_STATUSES = ["Offen", "Produkt suchen", "Produkt ausgewählt", "Bestätigt"] as const;
+export const MATERIAL_STATUSES = ["Offen", "Produkt ausgewählt", "Bestätigt"] as const;
+export function displayMaterialStatus(status: string) {
+  return status === "Produkt suchen" ? "Offen" : status;
+}
 export const UNITS = ["Stk", "m", "m²", "Set", "Pkg", "l", "kg"];
 export const PHOTO_CATEGORIES = ["Vorher", "Nachher", "Bestand", "Schaden", "Anschluss", "Masse", "Typenschild", "Sonstiges"];
+export const SERVICE_PHOTO_CATEGORIES = ["Vorher", "Während Arbeit", "Nachher", "Allgemein"] as const;
+export type ServicePhotoCategory = (typeof SERVICE_PHOTO_CATEGORIES)[number];
+export const DEFAULT_SERVICE_PHOTO_CATEGORY: ServicePhotoCategory = "Allgemein";
+
+export function servicePhotoCategory(raw: string | null | undefined): ServicePhotoCategory {
+  if (raw === "Vorher" || raw === "Nachher" || raw === "Während Arbeit" || raw === "Allgemein") return raw;
+  if (raw === "Während") return "Während Arbeit";
+  return "Allgemein";
+}
 
 export function customerName(c?: Pick<Customer, "company_name" | "first_name" | "last_name"> | null) {
   if (!c) return "Ohne Kunde";
@@ -92,6 +105,14 @@ export const statusTone: Record<string, string> = {
   "Produkt suchen": "bg-warning/20 text-foreground",
   "Produkt ausgewählt": "bg-accent text-accent-foreground",
   Bestätigt: "bg-success/15 text-success",
+  Abgesagt: "bg-destructive/15 text-destructive",
+  Aktiv: "bg-primary/10 text-primary",
+  "Wird gelesen": "bg-accent text-accent-foreground",
+  Ausgelesen: "bg-success/15 text-success",
+  "Lesen fehlgeschlagen": "bg-destructive/15 text-destructive",
+  Ausstehend: "bg-muted text-muted-foreground",
+  "Zur Prüfung": "bg-warning/20 text-foreground",
+  "Manuell prüfen": "bg-warning/20 text-foreground",
 };
 
 // ---- Job types & workflow steps ----
@@ -99,25 +120,52 @@ export type JobType = "project" | "service";
 export const JOB_TYPE_LABEL: Record<JobType, string> = { project: "Projekt", service: "Regie / Service" };
 
 export const PROJECT_STEPS = ["Begehung", "Analyse", "Grobkosten", "Produktauswahl", "Kalkulation", "Offerte", "Auftrag", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
+/** Legacy persisted values; UI uses displayServiceStatus. */
 export const SERVICE_STEPS = ["Neu", "Geplant", "In Arbeit", "Erledigt", "Verrechnet"] as const;
+export const SERVICE_DISPLAY_STATUSES = ["Offen", "Erledigt", "Verrechnet", "Abgesagt"] as const;
+
+/** UI labels; persisted job.status stays on PROJECT_STEPS values. */
+const PROJECT_STEP_LABEL: Record<string, string> = { Rechnung: "Abrechnung", Abgeschlossen: "Abschluss" };
+export function stepLabel(type: string, step: string) {
+  return type === "service" ? displayServiceStatus(step) : (PROJECT_STEP_LABEL[step] ?? step);
+}
 
 const LEGACY: Record<string, string> = { Neu: "Begehung", Aufnahme: "Begehung", Materialauswahl: "Produktauswahl" };
+const SERVICE_OPEN = new Set(["Neu", "Geplant", "In Arbeit", "Offen"]);
+
+export function displayServiceStatus(status: string) {
+  if (SERVICE_OPEN.has(status)) return "Offen";
+  if (status === "Abgesagt") return "Abgesagt";
+  if (status === "Erledigt" || status === "Verrechnet") return status;
+  return "Offen";
+}
+
 export function stepsFor(type: string): readonly string[] {
   return type === "service" ? SERVICE_STEPS : PROJECT_STEPS;
 }
 export function normalizeStatus(type: string, status: string) {
-  if (type === "service") return status;
+  if (type === "service") return displayServiceStatus(status);
   return LEGACY[status] ?? status;
 }
 export function isClosed(type: string, status: string) {
   const s = normalizeStatus(type, status);
-  return type === "service" ? s === "Erledigt" || s === "Verrechnet" : s === "Abgeschlossen";
+  return type === "service" ? s === "Verrechnet" : s === "Abgeschlossen";
 }
+
+export const ACTIVE_PROJECT_STEPS = PROJECT_STEPS.filter((s) => s !== "Abgeschlossen");
+export const ACTIVE_SERVICE_STEPS = ["Offen", "Erledigt"] as const;
 
 export const OPEN_STATUSES = ["offen", "geklärt", "nicht relevant"] as const;
 export const CONFIDENCE = ["niedrig", "mittel", "hoch"] as const;
-export const ESTIMATE_SECTIONS = ["Sanitärapparate", "Armaturen", "Installationsmaterial", "Arbeitsaufwand", "Demontage", "Entsorgung", "Anfahrt", "Kleinmaterial", "Reserve / Unvorhergesehenes", "Sonstiges"];
-export const EXTRA_COST_KINDS = ["Anfahrt", "Fahrzeugpauschale", "Entsorgung", "Kleinmaterial", "Spesen", "Sonstiges"];
+export const ESTIMATE_SECTIONS = ["Sanitärapparate", "Armaturen", "Installationsmaterial", "Arbeitsaufwand", "Demontage", "Entsorgung", "Fahrzeugpauschale", "Kleinmaterial", "Reserve / Unvorhergesehenes", "Sonstiges"];
+/** Extra-cost chips; Fahrzeugpauschale is a separate job field, not a chip. */
+export const EXTRA_COST_KINDS = ["Entsorgung", "Parkgebühren", "Fremdleistung", "Kleinmaterial", "Spesen", "Sonstiges"];
+export const VEHICLE_KIND = "Fahrzeugpauschale";
+export const DEFAULT_TECHNICIAN = "Timo Simonato";
+export function defaultTechnician(settings?: { default_technician?: string | null } | null) {
+  const n = settings?.default_technician?.trim();
+  return n || DEFAULT_TECHNICIAN;
+}
 export const ESTIMATE_DISCLAIMER = "Unverbindliche Grobkostenschätzung auf Basis der aktuellen Bestandesaufnahme und Kundenwünsche. Die definitive Offerte erfolgt nach Produktauswahl und Detailprüfung.";
 
 export const roundTo = (n: number, step = 100) => Math.round(n / step) * step;

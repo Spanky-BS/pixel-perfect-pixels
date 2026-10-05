@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { JobCard } from "@/components/JobCard";
-import { customersQuery, jobsQuery } from "@/lib/queries";
-import { address, customerName , isClosed } from "@/lib/app";
+import { jobsQuery } from "@/lib/queries";
+import { address, customerName } from "@/lib/app";
+import { isActiveJob } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/_authenticated/uebersicht")({
   head: () => ({
@@ -21,25 +22,20 @@ export const Route = createFileRoute("/_authenticated/uebersicht")({
 
 function Dashboard() {
   const jobs = useQuery(jobsQuery());
-  const customers = useQuery(customersQuery());
   const [q, setQ] = useState("");
 
-  const all = jobs.data ?? [];
-  const active = all.filter((j) => j.job_type !== "service" && !isClosed(j.job_type, j.status));
-  const openService = all.filter((j) => j.job_type === "service" && !isClosed(j.job_type, j.status));
-  const recent = all.slice(0, 5);
+  const all = (jobs.data ?? []).filter(isActiveJob);
+  const active = all.filter((j) => j.job_type !== "service");
+  const openService = all.filter((j) => j.job_type === "service");
+  const recent = [...all].sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 5);
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return null;
-    const js = all.filter((j) =>
+    return all.filter((j) =>
       [j.title, customerName(j.customers), address(j)].join(" ").toLowerCase().includes(s),
     );
-    const cs = (customers.data ?? []).filter((c) =>
-      [customerName(c), c.city, c.phone].join(" ").toLowerCase().includes(s),
-    );
-    return { js, cs };
-  }, [q, all, customers.data]);
+  }, [q, all]);
 
   return (
     <div className="space-y-6">
@@ -60,20 +56,14 @@ function Dashboard() {
       {results ? (
         <section className="space-y-3">
           <h2 className="section-title">Suchergebnisse</h2>
-          {results.js.map((j) => <JobCard key={j.id} job={j} />)}
-          {results.cs.map((c) => (
-            <Link key={c.id} to="/kunden/$id" params={{ id: c.id }} className="flex h-14 items-center gap-3 rounded-xl border bg-card px-4 font-medium">
-              <Users className="h-5 w-5 text-muted-foreground" /> {customerName(c)}
-            </Link>
-          ))}
-          {!results.js.length && !results.cs.length && <p className="text-sm text-muted-foreground">Keine Treffer.</p>}
+          {results.map((j) => <JobCard key={j.id} job={j} />)}
+          {!results.length && <p className="text-sm text-muted-foreground">Keine Treffer in den aktiven Aufträgen.</p>}
         </section>
       ) : (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <Stat label="Projekte" value={active.length} />
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Aktive Projekte" value={active.length} />
             <Stat label="Service offen" value={openService.length} />
-            <Stat label="Kunden" value={customers.data?.length ?? 0} />
           </div>
           <section className="space-y-3">
             <h2 className="section-title">Aktive Projekte</h2>
@@ -96,21 +86,6 @@ function Dashboard() {
               {recent.map((j) => <JobCard key={j.id} job={j} />)}
             </section>
           )}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="section-title">Kunden</h2>
-              <Link to="/kunden" className="text-sm font-semibold text-primary">Alle</Link>
-            </div>
-            <div className="divide-y rounded-xl border bg-card">
-              {(customers.data ?? []).slice(0, 5).map((c) => (
-                <Link key={c.id} to="/kunden/$id" params={{ id: c.id }} className="flex h-14 items-center justify-between px-4">
-                  <span className="font-medium">{customerName(c)}</span>
-                  <span className="text-sm text-muted-foreground">{c.city}</span>
-                </Link>
-              ))}
-              {!customers.data?.length && <p className="p-4 text-sm text-muted-foreground">Noch keine Kunden.</p>}
-            </div>
-          </section>
         </>
       )}
     </div>
@@ -119,7 +94,7 @@ function Dashboard() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border bg-card p-3">
+    <div className="rounded-xl border bg-card p-4">
       <div className="font-mono text-2xl font-medium text-primary">{value}</div>
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
     </div>

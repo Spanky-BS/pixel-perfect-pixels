@@ -8,9 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/CustomerForm";
-import { settingsQuery } from "@/lib/queries";
-import { EXTRA_COST_KINDS, UNITS, formatCHF, formatDate, signedUrls, uploadMedia, type Job } from "@/lib/app";
+import { settingsQuery, productsQuery } from "@/lib/queries";
+import { EXTRA_COST_KINDS, VEHICLE_KIND, defaultTechnician, UNITS, formatCHF, formatDate, signedUrls, uploadMedia, type Job } from "@/lib/app";
+import { isTravelLabour, isVehicleExtra, pickVehicleExtra } from "@/lib/service-billing";
+import { unitSalesPrice, type Product } from "@/lib/products";
 import { Row } from "./Kalkulation";
+
+export { isTravelLabour };
 
 type Table = "service_labour_entries" | "service_material_entries" | "service_additional_costs";
 type AnyRow = Record<string, unknown> & { id?: string; job_id: string };
@@ -34,14 +38,15 @@ async function saveRow(table: Table, row: AnyRow) {
   if (error) throw error;
 }
 
-function useServiceTotals(jobId: string) {
+export function useServiceTotals(jobId: string) {
   const lab = useRows("service_labour_entries", jobId);
   const mat = useRows("service_material_entries", jobId);
   const ext = useRows("service_additional_costs", jobId);
-  const labour = (lab.data ?? []).reduce((s, r) => s + Number(r["hours"]) * Number(r["hourly_rate"]), 0);
+  const billedLab = (lab.data ?? []).filter((r) => !isTravelLabour(r));
+  const labour = billedLab.reduce((s, r) => s + Number(r["hours"]) * Number(r["hourly_rate"]), 0);
   const material = (mat.data ?? []).reduce((s, r) => s + Number(r["quantity"]) * Number(r["sales_price"]), 0);
-  const extras = (ext.data ?? []).reduce((s, r) => s + Number(r["quantity"]) * Number(r["price"]), 0);
-  const hours = (lab.data ?? []).reduce((s, r) => s + Number(r["hours"]), 0);
+  const extras = (ext.data ?? []).filter((r) => !isVehicleExtra(r)).reduce((s, r) => s + Number(r["quantity"]) * Number(r["price"]), 0);
+  const hours = billedLab.reduce((s, r) => s + Number(r["hours"]), 0);
   return { labour, material, extras, hours, lab, mat, ext };
 }
 
@@ -53,13 +58,30 @@ const toLocalInput = (iso: unknown) => {
 const fromLocalInput = (v: string) => (v ? new Date(v).toISOString() : null);
 
 // ---------- Labour (actual effort) ----------
-export function ServiceLabour({ jobId }: { jobId: string }) {
+export function ServiceLabour({
+  jobId,
+  hideQuickActions,
+  startWith,
+  onStarted,
+}: {
+  jobId: string;
+  hideQuickActions?: boolean;
+  startWith?: "work" | null;
+  onStarted?: () => void;
+}) {
   const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
-  const { lab, labour, hours } = useServiceTotals(jobId);
+  const { lab } = useServiceTotals(jobId);
   const [d, setD] = useState<AnyRow | null>(null);
-  const rate = Number(settings.data?.service_hourly_rate ?? 120);
+  const rate = Number(settings.data?.service_hourly_rate ?? settings.data?.default_hourly_rate ?? 120);
+  const technician = defaultTechnician(settings.data);
   const refresh = () => qc.invalidateQueries({ queryKey: ["service_labour_entries", jobId] });
+
+  useEffect(() => {
+    if (!startWith) return;
+    setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() });
+    onStarted?.();
+  }, [startWith]);
 
   function setTime(k: "start_at" | "end_at", v: string) {
     if (!d) return;
@@ -69,19 +91,23 @@ export function ServiceLabour({ jobId }: { jobId: string }) {
     setD(next);
   }
 
+  const work = (lab.data ?? []).filter((r) => !isTravelLabour(r));
+  const workHours = work.reduce((s, r) => s + Number(r["hours"]), 0);
+  const workTotal = work.reduce((s, r) => s + Number(r["hours"]) * Number(r["hourly_rate"]), 0);
+
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <button className="action-tile-primary" onClick={() => setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, start_at: new Date().toISOString() })}><Plus className="h-6 w-6" />Arbeit erfassen</button>
-        <button className="action-tile" onClick={() => setD({ job_id: jobId, description: "Fahrtzeit", hours: 0.5, hourly_rate: Number(settings.data?.travel_rate ?? rate) })}><Plus className="h-6 w-6 text-primary" />Fahrtzeit</button>
-      </div>
-      {(lab.data ?? []).map((r) => (
+      {!hideQuickActions && (
+        <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() })}><Plus className="h-6 w-6" />Arbeit erfassen</button>
+      )}
+      <h3 className="text-sm font-bold">Arbeit</h3>
+      {work.map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || "–")} right={formatCHF(Number(r["hours"]) * Number(r["hourly_rate"]))}
           sub={[`${Number(r["hours"])} h × ${formatCHF(Number(r["hourly_rate"]))}`, r["technician"] as string, r["start_at"] ? formatDate(r["start_at"] as string, true) : null].filter(Boolean).join(" · ")}
           onEdit={() => setD(r)} onDelete={async () => { await supabase.from("service_labour_entries").delete().eq("id", r.id!); refresh(); }} />
       ))}
-      {!lab.data?.length && <Empty text="Noch keine Arbeitszeit erfasst." />}
-      <div className="rounded-lg bg-muted px-4 py-2"><Row label="Stunden total" value={`${hours} h`} /><Row label="Arbeit total" value={formatCHF(labour)} bold /></div>
+      {!work.length && <Empty text="Noch keine Arbeitszeit erfasst." />}
+      <div className="rounded-lg bg-muted px-4 py-2"><Row label="Arbeitsstunden" value={`${workHours} h`} /><Row label="Arbeit total" value={formatCHF(workTotal)} bold /></div>
 
       <EditSheet title="Arbeitszeit" row={d} onClose={() => setD(null)} onSave={async () => { await saveRow("service_labour_entries", d!); refresh(); setD(null); }}>
         {d && <>
@@ -103,11 +129,28 @@ export function ServiceLabour({ jobId }: { jobId: string }) {
 }
 
 // ---------- Material used ----------
-export function ServiceMaterial({ jobId }: { jobId: string }) {
+export function ServiceMaterial({
+  jobId,
+  hideQuickActions,
+  startWith,
+  onStarted,
+}: {
+  jobId: string;
+  hideQuickActions?: boolean;
+  startWith?: boolean;
+  onStarted?: () => void;
+}) {
   const qc = useQueryClient();
   const { mat, material } = useServiceTotals(jobId);
+  const products = useQuery(productsQuery());
   const [d, setD] = useState<AnyRow | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["service_material_entries", jobId] });
+
+  useEffect(() => {
+    if (!startWith) return;
+    setD({ job_id: jobId, quantity: 1, unit: "Stk", sales_price: 0 });
+    onStarted?.();
+  }, [startWith]);
   const txt = (k: string, label: string, ph?: string) => d && (
     <Field label={label}><Input className="h-12 text-base" placeholder={ph} value={String(d[k] ?? "")} onChange={(e) => setD({ ...d, [k]: e.target.value })} /></Field>
   );
@@ -116,7 +159,9 @@ export function ServiceMaterial({ jobId }: { jobId: string }) {
   );
   return (
     <div className="space-y-3">
-      <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, quantity: 1, unit: "Stk", sales_price: 0 })}><Plus className="h-6 w-6" />Material erfassen</button>
+      {!hideQuickActions && (
+        <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, quantity: 1, unit: "Stk", sales_price: 0 })}><Plus className="h-6 w-6" />Material erfassen</button>
+      )}
       {(mat.data ?? []).map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || "–")} right={formatCHF(Number(r["quantity"]) * Number(r["sales_price"]))}
           sub={[`${Number(r["quantity"])} ${r["unit"]} × ${formatCHF(Number(r["sales_price"]))}`, r["supplier"] as string, r["supplier_article_no"] as string].filter(Boolean).join(" · ")}
@@ -127,6 +172,31 @@ export function ServiceMaterial({ jobId }: { jobId: string }) {
       <EditSheet title="Material" row={d} onClose={() => setD(null)} onSave={async () => { await saveRow("service_material_entries", { ...d!, sales_price: Number(d!["sales_price"] ?? 0), quantity: Number(d!["quantity"] ?? 1) }); refresh(); setD(null); }}>
         {d && <>
           {txt("description", "Beschreibung", "z.B. Siphon 5/4\"")}
+          {(products.data?.length ?? 0) > 0 && (
+            <Field label="Aus Produktbibliothek (optional)">
+              <select
+                className="h-12 w-full rounded-md border border-input bg-card px-3 text-base"
+                defaultValue=""
+                onChange={(e) => {
+                  const p = products.data?.find((x) => x.id === e.target.value) as Product | undefined;
+                  if (!p || !d) return;
+                  const vk = unitSalesPrice(p) ?? Number(p.purchase_price ?? 0);
+                  setD({
+                    ...d,
+                    description: p.name,
+                    unit: p.unit || "Stk",
+                    purchase_price: p.purchase_price,
+                    sales_price: vk,
+                    supplier: p.supplier_name,
+                    supplier_article_no: p.supplier_article_no,
+                  });
+                }}
+              >
+                <option value="">– manuell oder wählen –</option>
+                {products.data?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </Field>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {num("quantity", "Menge")}
             <Field label="Einheit">
@@ -136,7 +206,7 @@ export function ServiceMaterial({ jobId }: { jobId: string }) {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">{num("purchase_price", "EK (optional)")}{num("sales_price", "VK CHF")}</div>
-          <div className="grid grid-cols-2 gap-3">{txt("supplier", "Lieferant")}{txt("supplier_article_no", "Art.-Nr.")}</div>
+          <div className="grid grid-cols-2 gap-3">{txt("supplier", "Lieferant (optional)")}{txt("supplier_article_no", "Art.-Nr. (optional)")}</div>
           {txt("notes", "Notiz")}
         </>}
       </EditSheet>
@@ -144,33 +214,151 @@ export function ServiceMaterial({ jobId }: { jobId: string }) {
   );
 }
 
-// ---------- Additional costs ----------
-export function ServiceExtras({ jobId }: { jobId: string }) {
+// ---------- Vehicle flat fee ----------
+const seedingVehicle = new Set<string>();
+
+export function ServiceVehicleFee({ jobId, startEdit, onStarted }: { jobId: string; startEdit?: boolean; onStarted?: () => void }) {
   const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
-  const { ext, extras } = useServiceTotals(jobId);
+  const { ext } = useServiceTotals(jobId);
+  const [editing, setEditing] = useState(false);
+  const row = pickVehicleExtra(ext.data ?? []);
+  const [amount, setAmount] = useState("");
+
+  useEffect(() => {
+    const settingsRow = settings.data;
+    if (!ext.data || row || !settingsRow || seedingVehicle.has(jobId)) return;
+    seedingVehicle.add(jobId);
+    void (async () => {
+      try {
+        const { data } = await supabase.from("service_additional_costs").select("id, kind").eq("job_id", jobId);
+        const existing = (data ?? []).some((r) => r.kind === VEHICLE_KIND || r.kind === "Anfahrt");
+        if (existing) return;
+        const price = Number(settingsRow.vehicle_fee ?? 0);
+        const { error } = await supabase.from("service_additional_costs").insert({
+          job_id: jobId,
+          kind: VEHICLE_KIND,
+          description: VEHICLE_KIND,
+          quantity: 1,
+          price,
+        });
+        if (error) toast.error(error.message);
+        else await qc.invalidateQueries({ queryKey: ["service_additional_costs", jobId] });
+      } finally {
+        seedingVehicle.delete(jobId);
+      }
+    })();
+  }, [ext.data, row, settings.data, jobId, qc]);
+
+  const value = row ? Number(row["quantity"]) * Number(row["price"]) : Number(settings.data?.vehicle_fee ?? 0);
+
+  useEffect(() => {
+    if (!startEdit) return;
+    setAmount(String(value));
+    setEditing(true);
+    onStarted?.();
+  }, [startEdit]);
+
+  async function saveAmount() {
+    const price = Number(amount);
+    if (!Number.isFinite(price)) return toast.error("Betrag ungültig");
+    const id = row?.["id"];
+    if (typeof id === "string") {
+      const { error } = await supabase.from("service_additional_costs").update({ price, quantity: 1, description: VEHICLE_KIND }).eq("id", id);
+      if (error) return toast.error(error.message);
+    } else {
+      const { error } = await supabase.from("service_additional_costs").insert({
+        job_id: jobId, kind: VEHICLE_KIND, description: VEHICLE_KIND, quantity: 1, price,
+      });
+      if (error) return toast.error(error.message);
+    }
+    setEditing(false);
+    qc.invalidateQueries({ queryKey: ["service_additional_costs", jobId] });
+  }
+
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-bold">Fahrzeug</h3>
+      <div className="flex items-center gap-2 rounded-xl border bg-card p-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{VEHICLE_KIND}</div>
+          <div className="font-mono text-sm">{formatCHF(value)}</div>
+        </div>
+        <button type="button" className="flex h-10 items-center rounded-lg border px-3 text-sm font-medium" onClick={() => { setAmount(String(value)); setEditing(true); }}>
+          Bearbeiten
+        </button>
+      </div>
+      <Sheet open={editing} onOpenChange={(o) => !o && setEditing(false)}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader><SheetTitle>{VEHICLE_KIND}</SheetTitle></SheetHeader>
+          <div className="space-y-3 p-4 pt-0">
+            <Field label="Betrag CHF">
+              <Input className="h-12 text-base" type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </Field>
+            <Button className="h-12 w-full font-semibold" onClick={() => void saveAmount()}>Speichern</Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </section>
+  );
+}
+
+// ---------- Additional costs ----------
+export function ServiceExtras({
+  jobId,
+  hideQuickActions,
+  startWith,
+  onStarted,
+}: {
+  jobId: string;
+  hideQuickActions?: boolean;
+  startWith?: string | null;
+  onStarted?: () => void;
+}) {
+  const qc = useQueryClient();
+  const settings = useQuery(settingsQuery());
+  const { ext } = useServiceTotals(jobId);
   const [d, setD] = useState<AnyRow | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["service_additional_costs", jobId] });
   const defaults: Record<string, number> = {
-    Fahrzeugpauschale: Number(settings.data?.vehicle_fee ?? 0),
     Kleinmaterial: Number(settings.data?.small_material_allowance ?? 0),
   };
+  useEffect(() => {
+    if (!startWith) return;
+    const k = startWith;
+    setD({ job_id: jobId, kind: k, description: k, quantity: 1, price: defaults[k] ?? 0 });
+    onStarted?.();
+  }, [startWith]);
+  const other = (ext.data ?? []).filter((r) => !isVehicleExtra(r));
+  const otherTotal = other.reduce((s, r) => s + Number(r["quantity"]) * Number(r["price"]), 0);
+
   return (
     <section className="space-y-2">
-      <h2 className="section-title">Zusatzkosten</h2>
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-        {EXTRA_COST_KINDS.map((k) => (
-          <button key={k} onClick={() => setD({ job_id: jobId, kind: k, description: k, quantity: 1, price: defaults[k] ?? 0 })} className="h-10 shrink-0 rounded-full border bg-card px-4 text-sm font-medium">+ {k}</button>
-        ))}
-      </div>
-      {(ext.data ?? []).map((r) => (
+      {!hideQuickActions && (
+        <>
+          <h2 className="section-title">Zusatzkosten</h2>
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {EXTRA_COST_KINDS.map((k) => (
+              <button key={k} onClick={() => setD({ job_id: jobId, kind: k, description: k, quantity: 1, price: defaults[k] ?? 0 })} className="h-10 shrink-0 rounded-full border bg-card px-4 text-sm font-medium">+ {k}</button>
+            ))}
+          </div>
+        </>
+      )}
+      <h3 className="text-sm font-bold">Zusatzkosten</h3>
+      {other.map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || r["kind"])} right={formatCHF(Number(r["quantity"]) * Number(r["price"]))}
           sub={`${Number(r["quantity"])} × ${formatCHF(Number(r["price"]))}`}
           onEdit={() => setD(r)} onDelete={async () => { await supabase.from("service_additional_costs").delete().eq("id", r.id!); refresh(); }} />
       ))}
-      {ext.data?.length ? <div className="rounded-lg bg-muted px-4 py-2"><Row label="Zusatzkosten total" value={formatCHF(extras)} bold /></div> : null}
+      {!other.length && <Empty text="Keine Zusatzkosten erfasst." />}
+      {other.length > 0 && <div className="rounded-lg bg-muted px-4 py-2"><Row label="Zusatzkosten total" value={formatCHF(otherTotal)} bold /></div>}
       <EditSheet title="Zusatzkosten" row={d} onClose={() => setD(null)} onSave={async () => { await saveRow("service_additional_costs", d!); refresh(); setD(null); }}>
         {d && <>
+          <Field label="Art">
+            <select className="h-12 w-full rounded-md border border-input bg-card px-3 text-base" value={String(d["kind"] ?? "Sonstiges")} onChange={(e) => setD({ ...d, kind: e.target.value, description: String(d["description"] || e.target.value) })}>
+              {Array.from(new Set([String(d["kind"] ?? ""), ...EXTRA_COST_KINDS])).filter(Boolean).map((k) => <option key={k}>{k}</option>)}
+            </select>
+          </Field>
           <Field label="Beschreibung"><Input className="h-12 text-base" value={String(d["description"] ?? "")} onChange={(e) => setD({ ...d, description: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Menge"><Input className="h-12 text-base" type="number" inputMode="decimal" value={String(d["quantity"] ?? 1)} onChange={(e) => setD({ ...d, quantity: Number(e.target.value) })} /></Field>
@@ -230,7 +418,7 @@ export function ServiceCompletion({ job, onStatus }: { job: Job; onStatus: (s: s
   }
   async function complete() {
     if (!job.work_confirmed) return toast.error("Bitte zuerst «Arbeit ausgeführt» bestätigen");
-    await update({ completion_notes: notes, completed_at: new Date().toISOString() });
+    await update({ completion_notes: notes, completed_at: new Date().toISOString(), lifecycle_status: "completed" });
     onStatus("Erledigt");
     toast.success("Auftrag abgeschlossen");
   }
@@ -283,7 +471,7 @@ export function ServiceCompletion({ job, onStatus }: { job: Job; onStatus: (s: s
   );
 }
 
-function SignaturePad({ onSave }: { onSave: (b: Blob) => void }) {
+export function SignaturePad({ onSave }: { onSave: (b: Blob) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const [dirty, setDirty] = useState(false);

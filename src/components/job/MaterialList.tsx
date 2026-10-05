@@ -10,7 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/CustomerForm";
 import { StatusBadge } from "@/components/Brand";
 import { categoriesQuery } from "@/lib/queries";
-import { MATERIAL_STATUSES, UNITS, type Material } from "@/lib/app";
+import { MATERIAL_STATUSES, UNITS, displayMaterialStatus, type Material } from "@/lib/app";
+import { ProductSearch } from "./ProductSearch";
 
 type Draft = Partial<Material> & { job_id: string };
 
@@ -18,7 +19,7 @@ export function useMaterials(jobId: string) {
   return useQuery({
     queryKey: ["materials", jobId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("material_requirements").select("*").eq("job_id", jobId).order("sort_order").order("created_at");
+      const { data, error } = await supabase.from("material_requirements").select("*, products(*)").eq("job_id", jobId).order("sort_order").order("created_at");
       if (error) throw error;
       return data;
     },
@@ -33,8 +34,8 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
 
   async function save() {
     if (!cur) return;
-    const { id, created_at, updated_at, user_id, ...rest } = cur;
-    void created_at; void updated_at; void user_id;
+    const { id, created_at, updated_at, user_id, products: _products, ...rest } = cur as Draft & { products?: unknown };
+    void created_at; void updated_at; void user_id; void _products;
     const payload = { ...rest, description: rest.description ?? "", job_id: cur.job_id };
     const { error } = id
       ? await supabase.from("material_requirements").update(payload).eq("id", id)
@@ -75,7 +76,7 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
             <Field label="Status">
               <div className="grid grid-cols-2 gap-2">
                 {MATERIAL_STATUSES.map((s) => (
-                  <button key={s} onClick={() => set("status", s)} className={`h-11 rounded-lg border text-sm font-medium ${cur.status === s ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}>{s}</button>
+                  <button key={s} onClick={() => set("status", s)} className={`h-11 rounded-lg border text-sm font-medium ${displayMaterialStatus(cur.status ?? "Offen") === s ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}>{s}</button>
                 ))}
               </div>
             </Field>
@@ -92,6 +93,7 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
   const qc = useQueryClient();
   const { data } = useMaterials(jobId);
   const cats = useQuery(categoriesQuery());
+  const [searchFor, setSearchFor] = useState<Material | null>(null);
   const catName = (id: string | null) => cats.data?.find((c) => c.id === id)?.name ?? "Ohne Kategorie";
   const list = data ?? [];
   const refresh = () => qc.invalidateQueries({ queryKey: ["materials", jobId] });
@@ -108,8 +110,8 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
     refresh();
   }
   async function duplicate(m: Material) {
-    const { id, created_at, updated_at, user_id, ...rest } = m;
-    void id; void created_at; void updated_at; void user_id;
+    const { id, created_at, updated_at, user_id, products: _products, ...rest } = m as Material & { products?: unknown };
+    void id; void created_at; void updated_at; void user_id; void _products;
     await supabase.from("material_requirements").insert({ ...rest, sort_order: m.sort_order + 1 });
     refresh();
   }
@@ -123,12 +125,15 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
 
   return (
     <div className="space-y-2">
-      {list.map((m, i) => (
+      {list.map((m, i) => {
+        const raw = (m as Material & { products?: { name: string } | { name: string }[] | null }).products;
+        const prod = Array.isArray(raw) ? raw[0] : raw;
+        return (
         <div key={m.id} className="rounded-xl border bg-card p-3">
           <button onClick={() => onEdit(m)} className="block w-full text-left">
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">{catName(m.category_id)}</span>
-              <StatusBadge status={m.status} />
+              <StatusBadge status={displayMaterialStatus(m.status)} />
             </div>
             <div className="flex items-baseline justify-between gap-3">
               <span className="font-semibold">{m.description || "–"}</span>
@@ -138,11 +143,15 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
               <div className="mt-1 text-sm text-muted-foreground">{[m.preferred_brand, m.dimensions, m.finish].filter(Boolean).join(" · ")}</div>
             )}
             {m.notes && <div className="mt-1 text-sm text-muted-foreground">{m.notes}</div>}
+            {prod && <div className="mt-1 text-sm font-medium text-primary">Produkt: {prod.name}</div>}
             {m.confidence && <div className="mt-1 text-[11px] font-semibold text-muted-foreground">KI-Vorschlag · Sicherheit: {m.confidence}</div>}
           </button>
-          {m.status === "Produkt suchen" && (
-            <button onClick={() => toast.info("Produktsuche folgt mit der Lieferantenanbindung (Richner).")} className="mt-2 h-10 w-full rounded-lg border border-primary text-sm font-semibold text-primary">Produkt finden</button>
-          )}
+          <button
+            onClick={() => setSearchFor(m)}
+            className="mt-2 h-10 w-full rounded-lg border border-primary text-sm font-semibold text-primary"
+          >
+            Produkt auswählen
+          </button>
           <div className="mt-2 flex justify-end gap-1 border-t pt-2">
             <IconBtn label="Nach oben" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp className="h-4 w-4" /></IconBtn>
             <IconBtn label="Nach unten" onClick={() => move(i, 1)} disabled={i === list.length - 1}><ArrowDown className="h-4 w-4" /></IconBtn>
@@ -151,7 +160,17 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
             <IconBtn label="Löschen" onClick={() => remove(m)} danger><Trash2 className="h-4 w-4" /></IconBtn>
           </div>
         </div>
-      ))}
+        );
+      })}
+      {searchFor && (
+        <ProductSearch
+          open
+          materialId={searchFor.id}
+          jobId={jobId}
+          hint={searchFor.description}
+          onClose={() => setSearchFor(null)}
+        />
+      )}
     </div>
   );
 }

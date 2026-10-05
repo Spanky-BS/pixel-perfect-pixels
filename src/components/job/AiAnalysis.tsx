@@ -37,7 +37,12 @@ export function AiAnalysis({ jobId, onEditMaterial, onEditLabour }: {
     setBusy(true);
     try {
       const r = await run({ data: { jobId } });
-      toast.success(r.count ? `${r.count} Anforderungen erkannt` : "Nichts erkannt – mehr Notizen erfassen");
+      if (r.skippedDocuments?.length) {
+        toast.success(r.count ? `${r.count} Anforderungen erkannt` : "Auswertung abgeschlossen");
+        toast.message(`Nicht automatisch ausgewertet: ${r.skippedDocuments.join(", ")}`);
+      } else {
+        toast.success(r.count ? `${r.count} Anforderungen erkannt` : "Nichts erkannt – mehr Notizen erfassen");
+      }
       qc.invalidateQueries({ queryKey: ["ai", jobId] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Auswertung fehlgeschlagen");

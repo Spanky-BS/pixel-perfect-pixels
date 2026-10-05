@@ -1,12 +1,18 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin, ChevronRight } from "lucide-react";
-import { JOB_TYPE_LABEL, address, customerName, formatDate, normalizeStatus, type Customer, type Job } from "@/lib/app";
+import { JOB_TYPE_LABEL, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Customer, type Job } from "@/lib/app";
 import { StatusBadge } from "./Brand";
+import { archiveDate, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
 
 export type JobWithCustomer = Job & { customers: Pick<Customer, "company_name" | "first_name" | "last_name"> | null };
 
 export function JobCard({ job }: { job: JobWithCustomer }) {
   const addr = address(job);
+  const life = lifecycleOf(job);
+  const badge = job.job_type === "service"
+    ? displayServiceStatus(job.status)
+    : life === "active" ? normalizeStatus(job.job_type, job.status) : lifecycleLabel(life);
+  const when = life === "active" ? `Bearbeitet ${formatDate(job.updated_at, true)}` : `${lifecycleLabel(life)} ${formatDate(archiveDate(job), true)}`;
   return (
     <Link
       to="/baustellen/$id"
@@ -20,7 +26,7 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
           </span>
           <span className="flex shrink-0 items-center gap-1">
             <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${job.job_type === "service" ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{job.job_type === "service" ? "Regie" : JOB_TYPE_LABEL.project}</span>
-            <StatusBadge status={normalizeStatus(job.job_type, job.status)} />
+            <StatusBadge status={badge} />
           </span>
         </div>
         <div className="truncate text-base font-semibold">{job.title}</div>
@@ -30,7 +36,7 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
             <span className="truncate">{addr}</span>
           </div>
         )}
-        <div className="mt-1 text-xs text-muted-foreground">Bearbeitet {formatDate(job.updated_at, true)}</div>
+        <div className="mt-1 text-xs text-muted-foreground">{when}</div>
       </div>
       <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
     </Link>

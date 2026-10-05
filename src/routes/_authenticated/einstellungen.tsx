@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/CustomerForm";
 import { PageHeader } from "@/components/Brand";
 import { IconBtn } from "@/components/job/MaterialList";
-import { categoriesQuery, settingsQuery } from "@/lib/queries";
-import { requireUserId } from "@/lib/app";
+import { categoriesQuery, productsQuery, settingsQuery } from "@/lib/queries";
+import { formatCHF, requireUserId } from "@/lib/app";
+import { matchesProduct, type Product } from "@/lib/products";
+import { ProductEditor, type ProductDraft } from "@/components/job/ProductEditor";
 
 export const Route = createFileRoute("/_authenticated/einstellungen")({
   head: () => ({
@@ -28,7 +30,18 @@ function SettingsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const settings = useQuery(settingsQuery());
-  const [s, setS] = useState({ company_name: "Haustechnik Nordwestschweiz", vat_rate: 8.1, default_hourly_rate: 120, default_material_markup: 0, estimate_tolerance: 20, service_hourly_rate: 120, travel_rate: 120, vehicle_fee: 0, small_material_allowance: 0 });
+  const [s, setS] = useState({
+    company_name: "Haustechnik Nordwestschweiz",
+    vat_rate: 8.1,
+    default_hourly_rate: 120,
+    default_material_markup: 0,
+    estimate_tolerance: 20,
+    service_hourly_rate: 120,
+    travel_rate: 120,
+    vehicle_fee: 0,
+    small_material_allowance: 0,
+    default_technician: "Timo Simonato",
+  });
 
   useEffect(() => {
     if (settings.data) setS({
@@ -41,12 +54,18 @@ function SettingsPage() {
       travel_rate: Number(settings.data.travel_rate),
       vehicle_fee: Number(settings.data.vehicle_fee),
       small_material_allowance: Number(settings.data.small_material_allowance),
+      default_technician: settings.data.default_technician?.trim() || "Timo Simonato",
     });
   }, [settings.data]);
 
   async function save() {
     const user_id = await requireUserId();
-    const { error } = await supabase.from("settings").upsert({ user_id, ...s, currency: "CHF" });
+    const { error } = await supabase.from("settings").upsert({
+      user_id,
+      ...s,
+      default_technician: s.default_technician.trim() || "Timo Simonato",
+      currency: "CHF",
+    });
     if (error) return toast.error(error.message);
     toast.success("Einstellungen gespeichert");
     qc.invalidateQueries({ queryKey: ["settings"] });
@@ -68,33 +87,85 @@ function SettingsPage() {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Währung"><Input className="h-12 text-base" value="CHF" disabled /></Field>
           <Field label="MWST %"><Input className="h-12 text-base" type="number" step="0.1" inputMode="decimal" value={s.vat_rate} onChange={(e) => setS({ ...s, vat_rate: Number(e.target.value) })} /></Field>
-          <Field label="Stundenansatz CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_hourly_rate} onChange={(e) => setS({ ...s, default_hourly_rate: Number(e.target.value) })} /></Field>
-          <Field label="Toleranz Grobkosten %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
+          <Field label="Standard-Stundensatz CHF">
+            <Input
+              className="h-12 text-base"
+              type="number"
+              inputMode="decimal"
+              value={s.default_hourly_rate}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                setS({ ...s, default_hourly_rate: n, service_hourly_rate: n });
+              }}
+            />
+          </Field>
+          <Field label="Grobkosten-Toleranz %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
-        </div>
-        <h2 className="section-title pt-2">Regie / Service</h2>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Service-Ansatz CHF/h"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.service_hourly_rate} onChange={(e) => setS({ ...s, service_hourly_rate: Number(e.target.value) })} /></Field>
-          <Field label="Fahrtzeit CHF/h"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.travel_rate} onChange={(e) => setS({ ...s, travel_rate: Number(e.target.value) })} /></Field>
           <Field label="Fahrzeugpauschale CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.vehicle_fee} onChange={(e) => setS({ ...s, vehicle_fee: Number(e.target.value) })} /></Field>
-          <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ ...s, small_material_allowance: Number(e.target.value) })} /></Field>
         </div>
+        <Field label="Standard-Techniker"><Input className="h-12 text-base" value={s.default_technician} onChange={(e) => setS({ ...s, default_technician: e.target.value })} /></Field>
+        <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ ...s, small_material_allowance: Number(e.target.value) })} /></Field>
         <Button className="h-12 w-full font-semibold" onClick={save}>Speichern</Button>
       </section>
 
       <Categories />
 
-      <section className="space-y-2 rounded-xl border bg-card p-4">
-        <h2 className="section-title">Lieferanten</h2>
-        <div className="flex items-center justify-between rounded-lg border p-3">
-          <div><div className="font-semibold">Richner</div><div className="text-xs text-muted-foreground">Bevorzugt · Priorität 1</div></div>
-          <span className="rounded bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground">nicht verbunden</span>
-        </div>
-        <p className="text-sm text-muted-foreground">Lieferanten-Anbindung, Preisvergleich und Bexio folgen in einer späteren Phase.</p>
-      </section>
+      <ProductLibrary />
+
+      <details className="rounded-xl border bg-card p-4">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground">Erweiterte Integrationen (optional, später)</summary>
+        <p className="mt-3 text-sm text-muted-foreground">
+          Live-Lieferanten und Bexio sind vorbereitet, aber nicht Teil des Testbetriebs. Die App funktioniert vollständig mit der eigenen Produktbibliothek.
+        </p>
+      </details>
 
       <Button variant="outline" className="h-12 w-full" onClick={logout}><LogOut className="h-4 w-4" /> Abmelden</Button>
     </div>
+  );
+}
+
+function ProductLibrary() {
+  const qc = useQueryClient();
+  const products = useQuery(productsQuery());
+  const cats = useQuery(categoriesQuery());
+  const [q, setQ] = useState("");
+  const [draft, setDraft] = useState<ProductDraft | null>(null);
+  const catName = (id: string | null) => cats.data?.find((c) => c.id === id)?.name ?? "";
+  const list = (products.data ?? []).filter((p) => matchesProduct(p, q, catName(p.category_id)));
+
+  async function remove(p: Product) {
+    if (!confirm(`«${p.name}» deaktivieren?`)) return;
+    await supabase.from("products").update({ active: false }).eq("id", p.id);
+    qc.invalidateQueries({ queryKey: ["products"] });
+  }
+
+  return (
+    <section className="space-y-3 rounded-xl border bg-card p-4">
+      <h2 className="section-title">Produktbibliothek</h2>
+      <Input className="h-12 text-base" placeholder="Suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <Button className="h-12 w-full font-semibold" onClick={() => setDraft({ name: "", unit: "Stk" })}>+ Produkt anlegen</Button>
+      {!list.length && <p className="text-sm text-muted-foreground">Noch keine Produkte. Manuell anlegen – ohne Lieferantenanbindung.</p>}
+      <div className="space-y-2">
+        {list.map((p) => (
+          <div key={p.id} className="rounded-lg border p-3">
+            <div className="font-semibold">{p.name}</div>
+            <div className="text-sm text-muted-foreground">{[catName(p.category_id), p.manufacturer, p.manufacturer_article_no].filter(Boolean).join(" · ")}</div>
+            <div className="mt-1 font-mono text-sm">EK {p.purchase_price != null ? formatCHF(Number(p.purchase_price)) : "–"}</div>
+            <div className="mt-2 flex gap-2">
+              <Button variant="outline" className="h-10 flex-1" onClick={() => setDraft(p)}>Bearbeiten</Button>
+              <Button variant="outline" className="h-10 text-destructive" onClick={() => remove(p)}>Entfernen</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <ProductEditor
+        key={draft ? (draft.id ?? "new") : "none"}
+        draft={draft}
+        categories={cats.data}
+        onClose={() => setDraft(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["products"] })}
+      />
+    </section>
   );
 }
 
