@@ -2,14 +2,14 @@
 export async function elementToPdf(el: HTMLElement, filename: string): Promise<File> {
   const { default: html2pdf } = await import("html2pdf.js");
   const blob: Blob = await html2pdf()
-    .set({
+    .set(({
       margin: [10, 10, 12, 10],
       filename: `${filename}.pdf`,
       image: { type: "jpeg", quality: 0.95 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       pagebreak: { mode: ["css", "legacy"], avoid: ["tr", ".sr-tot", ".sr-sig"] },
-    })
+    }) as Parameters<ReturnType<typeof html2pdf>["set"]>[0])
     .from(el)
     .outputPdf("blob");
   return new File([blob], `${filename}.pdf`, { type: "application/pdf" });

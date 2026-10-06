@@ -333,7 +333,7 @@ function OffertePreview({ job, jobId }: { job: JobWithCustomer; jobId: string })
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">Material</h3>
         {(materials.data ?? []).map((m) => {
-          const p = linkedProduct(m as { products?: Parameters<typeof linkedProduct>[0]["products"] });
+          const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
           const qty = Number(m.quantity);
           const vk = p ? unitSalesPrice(p, markup) : null;
           return (
@@ -471,7 +471,7 @@ function OffertePdfActions({
                 <thead><tr><th>Artikel</th><th className="num">Menge</th><th className="num">Preis</th><th className="num">Betrag</th></tr></thead>
                 <tbody>
                   {materials.map((m) => {
-                    const p = linkedProduct(m as { products?: Parameters<typeof linkedProduct>[0]["products"] });
+                    const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
                     const qty = Number(m.quantity);
                     const vk = p ? unitSalesPrice(p, markup) : null;
                     return (
