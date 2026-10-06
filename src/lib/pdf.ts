@@ -9,7 +9,7 @@ export async function elementToPdf(el: HTMLElement, filename: string): Promise<F
       html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
       jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
       pagebreak: { mode: ["css", "legacy"], avoid: ["tr", ".sr-tot", ".sr-sig"] },
-    }) as Parameters<ReturnType<typeof html2pdf>["set"]>[0])
+    }) as Record<string, unknown>)
     .from(el)
     .outputPdf("blob");
   return new File([blob], `${filename}.pdf`, { type: "application/pdf" });
