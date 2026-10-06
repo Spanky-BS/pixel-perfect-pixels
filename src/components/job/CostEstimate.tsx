@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
@@ -24,15 +24,19 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const cur = list.find((e) => e.id === sel) ?? list[0];
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
-  async function create() {
+  async function guideAmounts() {
     const [{ data: lab }, { data: mat }] = await Promise.all([
       supabase.from("labour_items").select("description, hours, hourly_rate, source").eq("job_id", jobId),
       supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
     ]);
-    const amounts = estimateFromGuide(
+    return estimateFromGuide(
       (mat ?? []).map((m) => ({ description: m.description, quantity: Number(m.quantity), category: (m.material_categories as { name: string } | null)?.name })),
       (lab ?? []).filter((l) => l.source !== "execution").map((l) => ({ description: l.description, hours: Number(l.hours), hourly_rate: Number(l.hourly_rate) })),
     );
+  }
+
+  async function create() {
+    const amounts = await guideAmounts();
     const { data, error } = await supabase.from("cost_estimates")
       .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: Number(settings.data?.estimate_tolerance ?? 20), notes: "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)" })
       .select("id").single();
@@ -43,6 +47,29 @@ export function CostEstimate({ jobId }: { jobId: string }) {
     if (Object.keys(amounts).length) toast.success("Mit Richtwerten aus Material & Arbeit vorbefüllt");
     setSel(data.id);
     refresh();
+  }
+
+  const [updating, setUpdating] = useState(false);
+  async function update() {
+    if (!cur) return;
+    if (!confirm("Beträge aus aktuellem Material & Arbeit neu berechnen? Manuell geänderte Beträge der Standard-Positionen werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
+    setUpdating(true);
+    try {
+      const amounts = await guideAmounts();
+      const existing = cur.cost_estimate_items;
+      await Promise.all(ESTIMATE_SECTIONS.map((section, i) => {
+        const row = existing.find((it) => it.section === section && it.description === section)
+          ?? existing.find((it) => it.section === section);
+        const amount = amounts[section] ?? 0;
+        if (row) return supabase.from("cost_estimate_items").update({ amount }).eq("id", row.id);
+        return supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section, description: section, amount, sort_order: i });
+      }));
+      await supabase.from("cost_estimates").update({ notes: `Aktualisiert am ${new Date().toLocaleString("de-CH")} aus Material & Arbeit` }).eq("id", cur.id);
+      toast.success("Grobkosten aktualisiert");
+      refresh();
+    } finally {
+      setUpdating(false);
+    }
   }
   async function duplicate() {
     if (!cur) return;
@@ -99,6 +126,10 @@ export function CostEstimate({ jobId }: { jobId: string }) {
         <div className="font-mono text-lg">{formatCHF(roundTo(total * (1 - tol / 100)))} – {formatCHF(roundTo(total * (1 + tol / 100)))}</div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{ESTIMATE_DISCLAIMER}</p>
       </div>
+
+      <button onClick={update} disabled={updating} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground disabled:opacity-60">
+        <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} /> Mit aktuellem Material & Arbeit aktualisieren
+      </button>
 
       <div className="grid grid-cols-2 gap-2">
         <label className="space-y-1"><span className="field-label">Toleranz %</span>
