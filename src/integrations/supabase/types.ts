@@ -962,6 +962,27 @@ export type Database = {
           },
         ]
       }
+      service_report_counters: {
+        Row: {
+          last_seq: number
+          month: number
+          user_id: string
+          year: number
+        }
+        Insert: {
+          last_seq?: number
+          month: number
+          user_id: string
+          year: number
+        }
+        Update: {
+          last_seq?: number
+          month?: number
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       settings: {
         Row: {
           company_name: string
@@ -1028,27 +1049,6 @@ export type Database = {
           user_id?: string
           vat_rate?: number
           vehicle_fee?: number
-        }
-        Relationships: []
-      }
-      service_report_counters: {
-        Row: {
-          last_seq: number
-          month: number
-          user_id: string
-          year: number
-        }
-        Insert: {
-          last_seq?: number
-          month: number
-          user_id: string
-          year: number
-        }
-        Update: {
-          last_seq?: number
-          month?: number
-          user_id?: string
-          year?: number
         }
         Relationships: []
       }
