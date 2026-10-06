@@ -15,6 +15,7 @@ import {
   type ServiceReportModel,
 } from "@/lib/service-report";
 import { trimSignatureImage } from "@/lib/signature";
+import { downloadFile, elementToPdf, shareOrDownload } from "@/lib/pdf";
 
 type JobForReport = Job & { customers?: Customer | null };
 
