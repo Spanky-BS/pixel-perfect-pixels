@@ -15,6 +15,7 @@ import {
   type ServiceReportModel,
 } from "@/lib/service-report";
 import { trimSignatureImage } from "@/lib/signature";
+import { downloadFile, elementToPdf, shareOrDownload } from "@/lib/pdf";
 
 type JobForReport = Job & { customers?: Customer | null };
 
@@ -399,13 +400,19 @@ export function ServiceReportAction({ job }: { job: JobForReport }) {
     }
   }
 
+  async function makePdf() {
+    if (!pageRef.current || !model) throw new Error("Rapport nicht bereit");
+    return elementToPdf(pageRef.current, model.filename);
+  }
+
   async function onDownload() {
     setBusy(true);
+    const t = toast.loading("PDF wird erstellt…");
     try {
-      downloadHtml(htmlOf(), model!.filename);
-      toast.success("Rapport gespeichert – im Browser «Drucken → Als PDF sichern» für ein PDF");
+      downloadFile(await makePdf());
+      toast.success("PDF gespeichert", { id: t });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Download fehlgeschlagen");
+      toast.error(e instanceof Error ? e.message : "Download fehlgeschlagen", { id: t });
     } finally {
       setBusy(false);
     }
@@ -414,23 +421,13 @@ export function ServiceReportAction({ job }: { job: JobForReport }) {
   async function onShare() {
     if (!model) return;
     setBusy(true);
+    const t = toast.loading("PDF wird erstellt…");
     try {
-      const html = htmlOf();
-      const file = new File([html], `${model.filename}.html`, { type: "text/html" });
-      const payload: ShareData = {
-        title: `Regierapport ${model.rapportNr}`,
-        text: `${model.title} – ${model.customerName}`,
-      };
-      if (navigator.canShare?.({ files: [file] })) payload.files = [file];
-      if (navigator.share) {
-        await navigator.share(payload);
-        return;
-      }
-      downloadHtml(html, model.filename);
-      toast.message("Teilen nicht verfügbar – Datei heruntergeladen");
+      const r = await shareOrDownload(await makePdf(), `Regierapport ${model.rapportNr}`);
+      if (r === "downloaded") toast.success("PDF heruntergeladen", { id: t });
+      else toast.dismiss(t);
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
-      toast.error(e instanceof Error ? e.message : "Teilen fehlgeschlagen");
+      toast.error(e instanceof Error ? e.message : "Teilen fehlgeschlagen", { id: t });
     } finally {
       setBusy(false);
     }
@@ -450,13 +447,13 @@ export function ServiceReportAction({ job }: { job: JobForReport }) {
           </SheetHeader>
           <div className="flex gap-2 px-4 pb-2">
             <Button className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onPrint()}>
-              <Printer className="h-4 w-4" /> Drucken / PDF
+              <Printer className="h-4 w-4" /> Drucken
             </Button>
             <Button variant="outline" className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onDownload()}>
-              <Download className="h-4 w-4" /> Herunterladen
+              <Download className="h-4 w-4" /> PDF speichern
             </Button>
             <Button variant="outline" className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onShare()}>
-              <Share2 className="h-4 w-4" /> Teilen
+              <Share2 className="h-4 w-4" /> PDF teilen
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 p-3">

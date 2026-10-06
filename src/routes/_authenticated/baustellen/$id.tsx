@@ -236,7 +236,7 @@ function JobPage() {
               status: "Bestätigt",
               total: totals.total,
             });
-            if (qErr) return toast.error(qErr.message);
+            if (qErr) { toast.error(qErr.message); return; }
             await setStatus("Ausführung");
             setSelectedWorkflowStep("Ausführung");
             toast.success("Offerte bestätigt – Ausführung");
