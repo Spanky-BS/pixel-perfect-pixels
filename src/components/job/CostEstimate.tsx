@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
 import { CONFIDENCE, ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, formatDate, roundTo } from "@/lib/app";
+import { estimateFromGuide } from "@/lib/price-guide";
 
 export function CostEstimate({ jobId }: { jobId: string }) {
   const qc = useQueryClient();
@@ -24,15 +25,22 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
   async function create() {
-    const { data: lab } = await supabase.from("labour_items").select("hours, hourly_rate, source").eq("job_id", jobId);
-    const labour = (lab ?? []).filter((l) => l.source !== "execution").reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
+    const [{ data: lab }, { data: mat }] = await Promise.all([
+      supabase.from("labour_items").select("description, hours, hourly_rate, source").eq("job_id", jobId),
+      supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
+    ]);
+    const amounts = estimateFromGuide(
+      (mat ?? []).map((m) => ({ description: m.description, quantity: Number(m.quantity), category: (m.material_categories as { name: string } | null)?.name })),
+      (lab ?? []).filter((l) => l.source !== "execution").map((l) => ({ description: l.description, hours: Number(l.hours), hourly_rate: Number(l.hourly_rate) })),
+    );
     const { data, error } = await supabase.from("cost_estimates")
-      .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: Number(settings.data?.estimate_tolerance ?? 20) })
+      .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: Number(settings.data?.estimate_tolerance ?? 20), notes: "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)" })
       .select("id").single();
     if (error) return toast.error(error.message);
     await supabase.from("cost_estimate_items").insert(ESTIMATE_SECTIONS.map((section, i) => ({
-      estimate_id: data.id, section, description: section, amount: section === "Arbeitsaufwand" ? labour : 0, sort_order: i,
+      estimate_id: data.id, section, description: section, amount: amounts[section] ?? 0, sort_order: i,
     })));
+    if (Object.keys(amounts).length) toast.success("Mit Richtwerten aus Material & Arbeit vorbefüllt");
     setSel(data.id);
     refresh();
   }
@@ -62,7 +70,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   if (!cur) {
     return (
       <div className="space-y-3 rounded-xl border border-dashed bg-card p-5 text-center">
-        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte.</p>
+        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte. Wird aus Material & Arbeit mit Schweizer Richtpreisen vorbefüllt.</p>
         <button onClick={create} className="h-12 w-full rounded-lg bg-primary font-semibold text-primary-foreground">Grobkostenschätzung erstellen</button>
       </div>
     );
