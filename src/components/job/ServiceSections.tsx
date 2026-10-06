@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/CustomerForm";
 import { settingsQuery, productsQuery } from "@/lib/queries";
 import { EXTRA_COST_KINDS, VEHICLE_KIND, defaultTechnician, UNITS, formatCHF, formatDate, signedUrls, uploadMedia, type Job } from "@/lib/app";
+import { cropCanvasInk } from "@/lib/signature";
 import { isTravelLabour, isVehicleExtra, pickVehicleExtra } from "@/lib/service-billing";
 import { unitSalesPrice, type Product } from "@/lib/products";
 import { Row } from "./Kalkulation";
@@ -491,7 +492,7 @@ export function SignaturePad({ onSave }: { onSave: (b: Blob) => void }) {
         onPointerUp={() => (drawing.current = false)} onPointerLeave={() => (drawing.current = false)} />
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" className="h-12" onClick={() => { const c = ref.current!; c.getContext("2d")!.clearRect(0, 0, c.width, c.height); setDirty(false); }}>Löschen</Button>
-        <Button className="h-12 font-semibold" disabled={!dirty} onClick={() => ref.current!.toBlob((b) => b && onSave(b), "image/png")}>Speichern</Button>
+        <Button className="h-12 font-semibold" disabled={!dirty} onClick={() => cropCanvasInk(ref.current!).toBlob((b) => b && onSave(b), "image/png")}>Speichern</Button>
       </div>
     </div>
   );

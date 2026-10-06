@@ -323,6 +323,8 @@ export type Database = {
           lifecycle_status: string
           notes: string | null
           problem_description: string | null
+          report_created_at: string | null
+          report_number: string | null
           signature_path: string | null
           status: string
           street: string | null
@@ -348,6 +350,8 @@ export type Database = {
           lifecycle_status?: string
           notes?: string | null
           problem_description?: string | null
+          report_created_at?: string | null
+          report_number?: string | null
           signature_path?: string | null
           status?: string
           street?: string | null
@@ -373,6 +377,8 @@ export type Database = {
           lifecycle_status?: string
           notes?: string | null
           problem_description?: string | null
+          report_created_at?: string | null
+          report_number?: string | null
           signature_path?: string | null
           status?: string
           street?: string | null
@@ -966,6 +972,13 @@ export type Database = {
           estimate_tolerance: number
           service_hourly_rate: number
           small_material_allowance: number
+          technician_city: string | null
+          technician_email: string | null
+          technician_phone: string | null
+          technician_role: string
+          technician_signature_path: string | null
+          technician_street: string | null
+          technician_zip: string | null
           travel_rate: number
           updated_at: string
           user_id: string
@@ -981,6 +994,13 @@ export type Database = {
           estimate_tolerance?: number
           service_hourly_rate?: number
           small_material_allowance?: number
+          technician_city?: string | null
+          technician_email?: string | null
+          technician_phone?: string | null
+          technician_role?: string
+          technician_signature_path?: string | null
+          technician_street?: string | null
+          technician_zip?: string | null
           travel_rate?: number
           updated_at?: string
           user_id: string
@@ -996,11 +1016,39 @@ export type Database = {
           estimate_tolerance?: number
           service_hourly_rate?: number
           small_material_allowance?: number
+          technician_city?: string | null
+          technician_email?: string | null
+          technician_phone?: string | null
+          technician_role?: string
+          technician_signature_path?: string | null
+          technician_street?: string | null
+          technician_zip?: string | null
           travel_rate?: number
           updated_at?: string
           user_id?: string
           vat_rate?: number
           vehicle_fee?: number
+        }
+        Relationships: []
+      }
+      service_report_counters: {
+        Row: {
+          last_seq: number
+          month: number
+          user_id: string
+          year: number
+        }
+        Insert: {
+          last_seq?: number
+          month: number
+          user_id: string
+          year: number
+        }
+        Update: {
+          last_seq?: number
+          month?: number
+          user_id?: string
+          year?: number
         }
         Relationships: []
       }
@@ -1352,7 +1400,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      assign_service_report_number: {
+        Args: { p_job_id: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

@@ -10,9 +10,11 @@ import { Field } from "@/components/CustomerForm";
 import { PageHeader } from "@/components/Brand";
 import { IconBtn } from "@/components/job/MaterialList";
 import { categoriesQuery, productsQuery, settingsQuery } from "@/lib/queries";
-import { formatCHF, requireUserId } from "@/lib/app";
+import { formatCHF, requireUserId, signedUrls, uploadProfileMedia, BUCKET } from "@/lib/app";
 import { matchesProduct, type Product } from "@/lib/products";
 import { ProductEditor, type ProductDraft } from "@/components/job/ProductEditor";
+import { SignaturePad } from "@/components/job/ServiceSections";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 export const Route = createFileRoute("/_authenticated/einstellungen")({
   head: () => ({
@@ -41,6 +43,12 @@ function SettingsPage() {
     vehicle_fee: 0,
     small_material_allowance: 0,
     default_technician: "Timo Simonato",
+    technician_role: "Monteur",
+    technician_phone: "",
+    technician_email: "",
+    technician_street: "",
+    technician_zip: "",
+    technician_city: "",
   });
 
   useEffect(() => {
@@ -55,19 +63,27 @@ function SettingsPage() {
       vehicle_fee: Number(settings.data.vehicle_fee),
       small_material_allowance: Number(settings.data.small_material_allowance),
       default_technician: settings.data.default_technician?.trim() || "Timo Simonato",
+      technician_role: settings.data.technician_role?.trim() || "Monteur",
+      technician_phone: settings.data.technician_phone ?? "",
+      technician_email: settings.data.technician_email ?? "",
+      technician_street: settings.data.technician_street ?? "",
+      technician_zip: settings.data.technician_zip ?? "",
+      technician_city: settings.data.technician_city ?? "",
     });
   }, [settings.data]);
 
-  async function save() {
+  async function saveCompany() {
     const user_id = await requireUserId();
     const { error } = await supabase.from("settings").upsert({
       user_id,
-      ...s,
-      default_technician: s.default_technician.trim() || "Timo Simonato",
+      company_name: s.company_name,
+      vat_rate: s.vat_rate,
+      default_material_markup: s.default_material_markup,
+      estimate_tolerance: s.estimate_tolerance,
       currency: "CHF",
     });
     if (error) return toast.error(error.message);
-    toast.success("Einstellungen gespeichert");
+    toast.success("Firmeneinstellungen gespeichert");
     qc.invalidateQueries({ queryKey: ["settings"] });
   }
 
@@ -87,26 +103,17 @@ function SettingsPage() {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Währung"><Input className="h-12 text-base" value="CHF" disabled /></Field>
           <Field label="MWST %"><Input className="h-12 text-base" type="number" step="0.1" inputMode="decimal" value={s.vat_rate} onChange={(e) => setS({ ...s, vat_rate: Number(e.target.value) })} /></Field>
-          <Field label="Standard-Stundensatz CHF">
-            <Input
-              className="h-12 text-base"
-              type="number"
-              inputMode="decimal"
-              value={s.default_hourly_rate}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                setS({ ...s, default_hourly_rate: n, service_hourly_rate: n });
-              }}
-            />
-          </Field>
           <Field label="Grobkosten-Toleranz %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
-          <Field label="Fahrzeugpauschale CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.vehicle_fee} onChange={(e) => setS({ ...s, vehicle_fee: Number(e.target.value) })} /></Field>
         </div>
-        <Field label="Standard-Techniker"><Input className="h-12 text-base" value={s.default_technician} onChange={(e) => setS({ ...s, default_technician: e.target.value })} /></Field>
-        <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ ...s, small_material_allowance: Number(e.target.value) })} /></Field>
-        <Button className="h-12 w-full font-semibold" onClick={save}>Speichern</Button>
+        <Button className="h-12 w-full font-semibold" onClick={saveCompany}>Speichern</Button>
       </section>
+
+      <EmployeeProfile
+        s={s}
+        setS={(p) => setS((cur) => ({ ...cur, ...p }))}
+        signaturePath={settings.data?.technician_signature_path ?? null}
+      />
 
       <Categories />
 
@@ -121,6 +128,169 @@ function SettingsPage() {
 
       <Button variant="outline" className="h-12 w-full" onClick={logout}><LogOut className="h-4 w-4" /> Abmelden</Button>
     </div>
+  );
+}
+
+type ProfileState = {
+  default_hourly_rate: number;
+  service_hourly_rate: number;
+  vehicle_fee: number;
+  small_material_allowance: number;
+  default_technician: string;
+  technician_role: string;
+  technician_phone: string;
+  technician_email: string;
+  technician_street: string;
+  technician_zip: string;
+  technician_city: string;
+};
+
+function blank(v: string) {
+  const t = v.trim();
+  return t || null;
+}
+
+function EmployeeProfile({
+  s,
+  setS,
+  signaturePath,
+}: {
+  s: ProfileState;
+  setS: (patch: Partial<ProfileState>) => void;
+  signaturePath: string | null;
+}) {
+  const qc = useQueryClient();
+  const [sigOpen, setSigOpen] = useState(false);
+  const sig = useQuery({
+    queryKey: ["sig", signaturePath],
+    enabled: !!signaturePath,
+    queryFn: async () => (await signedUrls([signaturePath!]))[signaturePath!] ?? null,
+  });
+
+  async function saveProfile() {
+    const user_id = await requireUserId();
+    const n = Number(s.default_hourly_rate);
+    const { error } = await supabase.from("settings").upsert({
+      user_id,
+      default_technician: s.default_technician.trim() || "Timo Simonato",
+      technician_role: s.technician_role.trim() || "Monteur",
+      technician_phone: blank(s.technician_phone),
+      technician_email: blank(s.technician_email),
+      technician_street: blank(s.technician_street),
+      technician_zip: blank(s.technician_zip),
+      technician_city: blank(s.technician_city),
+      default_hourly_rate: n,
+      service_hourly_rate: n,
+      vehicle_fee: Number(s.vehicle_fee),
+      small_material_allowance: Number(s.small_material_allowance),
+      currency: "CHF",
+    });
+    if (error) return toast.error(error.message);
+    toast.success("Stammdaten gespeichert");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
+
+  async function storeSignature(blob: Blob) {
+    const user_id = await requireUserId();
+    const path = await uploadProfileMedia(blob, "png");
+    if (signaturePath) await supabase.storage.from(BUCKET).remove([signaturePath]);
+    const { error } = await supabase.from("settings").upsert({
+      user_id,
+      technician_signature_path: path,
+      currency: "CHF",
+    });
+    if (error) return toast.error(error.message);
+    toast.success("Unterschrift gespeichert");
+    setSigOpen(false);
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
+
+  async function clearSignature() {
+    if (!signaturePath || !confirm("Unterschrift entfernen?")) return;
+    const user_id = await requireUserId();
+    await supabase.storage.from(BUCKET).remove([signaturePath]);
+    const { error } = await supabase.from("settings").upsert({
+      user_id,
+      technician_signature_path: null,
+      currency: "CHF",
+    });
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
+
+  return (
+    <section className="space-y-4 rounded-xl border bg-card p-4">
+      <h2 className="section-title">Stammdaten / Mitarbeiterprofil</h2>
+      <p className="text-sm text-muted-foreground">Gilt als Vorgabe für Regie (Name, Ansatz, Pauschalen, Unterschrift). Erfasste Auftragswerte bleiben unverändert.</p>
+
+      <h3 className="text-sm font-bold">Person</h3>
+      <Field label="Name"><Input className="h-12 text-base" value={s.default_technician} onChange={(e) => setS({ default_technician: e.target.value })} /></Field>
+      <Field label="Funktion"><Input className="h-12 text-base" value={s.technician_role} onChange={(e) => setS({ technician_role: e.target.value })} /></Field>
+
+      <h3 className="text-sm font-bold">Kontakt</h3>
+      <Field label="Telefon"><Input className="h-12 text-base" type="tel" value={s.technician_phone} onChange={(e) => setS({ technician_phone: e.target.value })} /></Field>
+      <Field label="E-Mail"><Input className="h-12 text-base" type="email" value={s.technician_email} onChange={(e) => setS({ technician_email: e.target.value })} /></Field>
+
+      <h3 className="text-sm font-bold">Adresse</h3>
+      <Field label="Strasse"><Input className="h-12 text-base" value={s.technician_street} onChange={(e) => setS({ technician_street: e.target.value })} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="PLZ"><Input className="h-12 text-base" value={s.technician_zip} onChange={(e) => setS({ technician_zip: e.target.value })} /></Field>
+        <Field label="Ort"><Input className="h-12 text-base" value={s.technician_city} onChange={(e) => setS({ technician_city: e.target.value })} /></Field>
+      </div>
+
+      <h3 className="text-sm font-bold">Ansätze / Pauschalen</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Standard-Stundensatz CHF">
+          <Input
+            className="h-12 text-base"
+            type="number"
+            inputMode="decimal"
+            value={s.default_hourly_rate}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setS({ default_hourly_rate: n, service_hourly_rate: n });
+            }}
+          />
+        </Field>
+        <Field label="Fahrzeugpauschale CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.vehicle_fee} onChange={(e) => setS({ vehicle_fee: Number(e.target.value) })} /></Field>
+        <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ small_material_allowance: Number(e.target.value) })} /></Field>
+      </div>
+
+      <h3 className="text-sm font-bold">Digitale Unterschrift</h3>
+      {sig.data ? (
+        <img src={sig.data} alt="Unterschrift" className="h-[68px] w-[170px] object-contain object-left bg-muted/40" />
+      ) : (
+        <p className="text-sm text-muted-foreground">Keine Unterschrift hinterlegt</p>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" className="h-12" onClick={() => setSigOpen(true)}>{signaturePath ? "Neu erfassen" : "Unterschrift erfassen"}</Button>
+        <label className="flex h-12 cursor-pointer items-center justify-center rounded-md border bg-card text-sm font-semibold">
+          Bild hochladen
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) await storeSignature(f);
+            }}
+          />
+        </label>
+      </div>
+      {signaturePath && (
+        <button type="button" className="text-sm font-semibold text-destructive" onClick={() => void clearSignature()}>Unterschrift entfernen</button>
+      )}
+
+      <Button className="h-12 w-full font-semibold" onClick={() => void saveProfile()}>Stammdaten speichern</Button>
+
+      <Sheet open={sigOpen} onOpenChange={setSigOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetHeader><SheetTitle>Unterschrift erfassen</SheetTitle></SheetHeader>
+          {sigOpen && <SignaturePad onSave={(b) => void storeSignature(b)} />}
+        </SheetContent>
+      </Sheet>
+    </section>
   );
 }
 

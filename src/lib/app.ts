@@ -70,6 +70,16 @@ export async function uploadMedia(jobId: string, file: Blob, ext: string) {
   return path;
 }
 
+export async function uploadProfileMedia(file: Blob, ext: string) {
+  const uid = await requireUserId();
+  const path = `${uid}/profile/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+  });
+  if (error) throw error;
+  return path;
+}
+
 export async function signedUrls(paths: string[]) {
   if (!paths.length) return {} as Record<string, string>;
   const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 60 * 60);

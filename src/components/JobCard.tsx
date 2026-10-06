@@ -30,6 +30,9 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
           </span>
         </div>
         <div className="truncate text-base font-semibold">{job.title}</div>
+        {job.job_type === "service" && job.report_number && (
+          <div className="mt-0.5 truncate text-sm font-medium text-primary">{job.report_number}</div>
+        )}
         {addr && (
           <div className="mt-1 flex items-center gap-1 truncate text-sm text-muted-foreground">
             <MapPin className="h-3.5 w-3.5 shrink-0" />

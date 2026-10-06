@@ -33,7 +33,7 @@ function Dashboard() {
     const s = q.trim().toLowerCase();
     if (!s) return null;
     return all.filter((j) =>
-      [j.title, customerName(j.customers), address(j)].join(" ").toLowerCase().includes(s),
+      [j.title, customerName(j.customers), address(j), j.report_number].join(" ").toLowerCase().includes(s),
     );
   }, [q, all]);
 
@@ -54,7 +54,7 @@ function Dashboard() {
 
       <div className="relative">
         <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Auftrag oder Kunde suchen" className="h-12 rounded-2xl border-0 bg-card pl-11 text-base shadow-[var(--shadow-card)]" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Auftrag, Kunde oder Rapportnummer" className="h-12 rounded-2xl border-0 bg-card pl-11 text-base shadow-[var(--shadow-card)]" />
       </div>
 
       {results ? (

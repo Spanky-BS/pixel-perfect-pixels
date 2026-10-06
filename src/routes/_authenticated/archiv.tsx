@@ -36,7 +36,7 @@ function ArchivePage() {
     if (filter === "service" && j.job_type !== "service") return false;
     const s = q.trim().toLowerCase();
     if (!s) return true;
-    return [j.title, customerName(j.customers), address(j)].join(" ").toLowerCase().includes(s);
+    return [j.title, customerName(j.customers), address(j), j.report_number].join(" ").toLowerCase().includes(s);
   }).sort((a, b) => archiveDate(b).localeCompare(archiveDate(a)));
 
   return (
@@ -45,7 +45,7 @@ function ArchivePage() {
       <p className="mb-3 text-sm text-muted-foreground">Abgeschlossen und abgesagt – Daten bleiben erhalten.</p>
       <div className="relative mb-3">
         <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kunde, Titel oder Adresse" className="h-12 bg-card pl-10 text-base" />
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kunde, Titel, Adresse oder Rapportnummer" className="h-12 bg-card pl-10 text-base" />
       </div>
       <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {([

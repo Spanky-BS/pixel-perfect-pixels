@@ -19,7 +19,8 @@ import {
   useServiceTotals,
 } from "@/components/job/ServiceSections";
 import { Row } from "@/components/job/Kalkulation";
-import { address, displayServiceStatus, formatCHF, formatDate, servicePhotoCategory, signedUrls, uploadMedia, type Job } from "@/lib/app";
+import { ServiceReportAction } from "@/components/job/ServiceReport";
+import { address, displayServiceStatus, formatCHF, formatDate, servicePhotoCategory, signedUrls, uploadMedia, type Customer, type Job } from "@/lib/app";
 import { isTravelLabour, serviceBill } from "@/lib/service-billing";
 import { cancelJob } from "@/lib/lifecycle";
 import { settingsQuery } from "@/lib/queries";
@@ -33,9 +34,7 @@ const SECTIONS: [Section, string][] = [
   ["abschluss", "Abschluss"],
 ];
 
-type ServiceJob = Job & {
-  customers?: { id: string; company_name: string | null; first_name: string | null; last_name: string | null; phone?: string | null } | null;
-};
+type ServiceJob = Job & { customers?: Customer | null };
 
 export function ServiceJobView({
   job,
@@ -140,6 +139,7 @@ function ServiceAuftrag({ job }: { job: ServiceJob }) {
     <div className="space-y-4">
       <section className="space-y-2 rounded-xl border bg-card p-4 text-sm">
         <h2 className="section-title">Auftrag</h2>
+        {job.report_number && <p><span className="font-semibold">Rapportnummer: </span>{job.report_number}</p>}
         {job.problem_description && <p><span className="font-semibold">Problem: </span>{job.problem_description}</p>}
         {job.customer_request && <p><span className="font-semibold">Kundenwunsch: </span>{job.customer_request}</p>}
         {address(job) && <p className="text-muted-foreground">{address(job)}</p>}
@@ -261,11 +261,17 @@ function ServiceClose({ job }: { job: ServiceJob }) {
         {!after && <p className="text-sm text-muted-foreground">Keine Nachher-Fotos vorhanden</p>}
         {after > 0 && <PhotoGallery jobId={job.id} variant="service" filterCategories={["Nachher"]} title="Nachher-Fotos" />}
       </section>
+      {job.report_number && (
+        <section className="rounded-xl border bg-card p-4 text-sm">
+          <p><span className="font-semibold">Rapportnummer: </span>{job.report_number}</p>
+        </section>
+      )}
       <section className="space-y-2">
         <h2 className="section-title">Unterschrift Kunde (optional)</h2>
         {sig.data ? <img src={sig.data} alt="Unterschrift" className="h-32 w-full rounded-xl border bg-card object-contain" /> : null}
         <Button variant="outline" className="h-12 w-full" onClick={() => setSigOpen(true)}>{job.signature_path ? "Neu unterschreiben" : "Unterschrift erfassen"}</Button>
       </section>
+      <ServiceReportAction job={job} />
       {warnings.length > 0 && (
         <div className="space-y-1 rounded-lg border border-warning bg-warning/15 p-3 text-sm">
           {warnings.map((w) => <p key={w}>{w}</p>)}

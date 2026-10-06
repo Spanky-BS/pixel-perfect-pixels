@@ -20,6 +20,10 @@ function vehicleRows(ext: Record<string, unknown>[]) {
   return ext.filter((r) => kindOf(r) === "Anfahrt");
 }
 
+export function billedVehicleExtras(ext: Record<string, unknown>[]) {
+  return vehicleRows(ext);
+}
+
 export function pickVehicleExtra(ext: Record<string, unknown>[]) {
   return vehicleRows(ext)[0] ?? null;
 }
