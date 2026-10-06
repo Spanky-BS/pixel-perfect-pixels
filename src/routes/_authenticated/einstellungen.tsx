@@ -97,16 +97,21 @@ function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Einstellungen" />
-      <section className="space-y-3 rounded-xl border bg-card p-4">
-        <h2 className="section-title">Firma & Allgemein</h2>
+      <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h2 className="section-title">Firma</h2>
         <Field label="Firma"><Input className="h-12 text-base" value={s.company_name} onChange={(e) => setS({ ...s, company_name: e.target.value })} /></Field>
+        <Field label="Währung"><Input className="h-12 text-base" value="CHF" disabled /></Field>
+        <Button className="h-12 w-full font-medium" onClick={saveCompany}>Firma speichern</Button>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h2 className="section-title">Preise & Kalkulation</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Währung"><Input className="h-12 text-base" value="CHF" disabled /></Field>
           <Field label="MWST %"><Input className="h-12 text-base" type="number" step="0.1" inputMode="decimal" value={s.vat_rate} onChange={(e) => setS({ ...s, vat_rate: Number(e.target.value) })} /></Field>
           <Field label="Grobkosten-Toleranz %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
         </div>
-        <Button className="h-12 w-full font-semibold" onClick={saveCompany}>Speichern</Button>
+        <Button className="h-12 w-full font-medium" onClick={saveCompany}>Preise speichern</Button>
       </section>
 
       <EmployeeProfile
@@ -115,12 +120,17 @@ function SettingsPage() {
         signaturePath={settings.data?.technician_signature_path ?? null}
       />
 
-      <Categories />
+      <details className="rounded-2xl border border-border/70 bg-card p-4">
+        <summary className="cursor-pointer text-base font-semibold">Produkte & Material</summary>
+        <p className="mt-2 text-sm text-muted-foreground">Materialkategorien und interne Produktbibliothek.</p>
+        <div className="mt-4 space-y-4">
+          <Categories />
+          <ProductLibrary />
+        </div>
+      </details>
 
-      <ProductLibrary />
-
-      <details className="rounded-xl border bg-card p-4">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-muted-foreground">Erweiterte Integrationen (optional, später)</summary>
+      <details className="rounded-2xl border border-border/70 bg-card p-4">
+        <summary className="cursor-pointer text-base font-semibold">Integrationen</summary>
         <p className="mt-3 text-sm text-muted-foreground">
           Live-Lieferanten und Bexio sind vorbereitet, aber nicht Teil des Testbetriebs. Die App funktioniert vollständig mit der eigenen Produktbibliothek.
         </p>
@@ -219,26 +229,28 @@ function EmployeeProfile({
   }
 
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-4">
-      <h2 className="section-title">Stammdaten / Mitarbeiterprofil</h2>
-      <p className="text-sm text-muted-foreground">Gilt als Vorgabe für Regie (Name, Ansatz, Pauschalen, Unterschrift). Erfasste Auftragswerte bleiben unverändert.</p>
+    <section className="space-y-5 rounded-2xl border border-border/70 bg-card p-4">
+      <div>
+        <h2 className="section-title">Timo / Stammdaten</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Vorgaben für Regie, Rapporte und Unterschrift. Erfasste Auftragswerte bleiben unverändert.</p>
+      </div>
 
-      <h3 className="text-sm font-bold">Person</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">Person</h3>
       <Field label="Name"><Input className="h-12 text-base" value={s.default_technician} onChange={(e) => setS({ default_technician: e.target.value })} /></Field>
       <Field label="Funktion"><Input className="h-12 text-base" value={s.technician_role} onChange={(e) => setS({ technician_role: e.target.value })} /></Field>
 
-      <h3 className="text-sm font-bold">Kontakt</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">Kontakt</h3>
       <Field label="Telefon"><Input className="h-12 text-base" type="tel" value={s.technician_phone} onChange={(e) => setS({ technician_phone: e.target.value })} /></Field>
       <Field label="E-Mail"><Input className="h-12 text-base" type="email" value={s.technician_email} onChange={(e) => setS({ technician_email: e.target.value })} /></Field>
 
-      <h3 className="text-sm font-bold">Adresse</h3>
+      <h3 className="text-sm font-medium text-muted-foreground">Adresse</h3>
       <Field label="Strasse"><Input className="h-12 text-base" value={s.technician_street} onChange={(e) => setS({ technician_street: e.target.value })} /></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="PLZ"><Input className="h-12 text-base" value={s.technician_zip} onChange={(e) => setS({ technician_zip: e.target.value })} /></Field>
         <Field label="Ort"><Input className="h-12 text-base" value={s.technician_city} onChange={(e) => setS({ technician_city: e.target.value })} /></Field>
       </div>
 
-      <h3 className="text-sm font-bold">Ansätze / Pauschalen</h3>
+      <h3 className="border-t pt-4 text-sm font-medium text-muted-foreground">Preise & Pauschalen</h3>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Standard-Stundensatz CHF">
           <Input
@@ -256,7 +268,7 @@ function EmployeeProfile({
         <Field label="Kleinmaterial CHF"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.small_material_allowance} onChange={(e) => setS({ small_material_allowance: Number(e.target.value) })} /></Field>
       </div>
 
-      <h3 className="text-sm font-bold">Digitale Unterschrift</h3>
+      <h3 className="border-t pt-4 text-sm font-medium text-muted-foreground">Digitale Unterschrift</h3>
       {sig.data ? (
         <img src={sig.data} alt="Unterschrift" className="h-[68px] w-[170px] object-contain object-left bg-muted/40" />
       ) : (
@@ -282,7 +294,7 @@ function EmployeeProfile({
         <button type="button" className="text-sm font-semibold text-destructive" onClick={() => void clearSignature()}>Unterschrift entfernen</button>
       )}
 
-      <Button className="h-12 w-full font-semibold" onClick={() => void saveProfile()}>Stammdaten speichern</Button>
+      <Button className="h-12 w-full font-medium" onClick={() => void saveProfile()}>Stammdaten speichern</Button>
 
       <Sheet open={sigOpen} onOpenChange={setSigOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl">
@@ -310,7 +322,7 @@ function ProductLibrary() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-4">
+    <section className="space-y-3 rounded-xl bg-muted/40 p-4">
       <h2 className="section-title">Produktbibliothek</h2>
       <Input className="h-12 text-base" placeholder="Suchen…" value={q} onChange={(e) => setQ(e.target.value)} />
       <Button className="h-12 w-full font-semibold" onClick={() => setDraft({ name: "", unit: "Stk" })}>+ Produkt anlegen</Button>
@@ -375,7 +387,7 @@ function Categories() {
   }
 
   return (
-    <section className="space-y-3 rounded-xl border bg-card p-4">
+    <section className="space-y-3 rounded-xl bg-muted/40 p-4">
       <h2 className="section-title">Materialkategorien</h2>
       <div className="flex gap-2">
         <Input className="h-12 text-base" placeholder="Neue Kategorie" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && add()} />

@@ -13,7 +13,7 @@ export function Brand({ large = false }: { large?: boolean }) {
 
 export function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold ${statusTone[status] ?? "bg-muted"}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-md px-2 py-0.5 text-[11px] font-medium ${statusTone[status] ?? "bg-muted"}`}>
       {status}
     </span>
   );
@@ -21,8 +21,8 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function PageHeader({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+    <div className="mb-5 flex items-center justify-between gap-3">
+      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       {action}
     </div>
   );

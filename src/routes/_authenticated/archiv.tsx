@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/Brand";
 import { Input } from "@/components/ui/input";
 import { jobsQuery } from "@/lib/queries";
 import { address, customerName } from "@/lib/app";
-import { archiveDate, isActiveJob, lifecycleOf } from "@/lib/lifecycle";
+import { archiveDate, isActiveJob } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/_authenticated/archiv")({
   head: () => ({
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_authenticated/archiv")({
   component: ArchivePage,
 });
 
-type Filter = "all" | "completed" | "cancelled" | "project" | "service";
+type Filter = "all" | "project" | "service";
 
 function ArchivePage() {
   const { data, isLoading } = useQuery(jobsQuery());
@@ -29,9 +29,6 @@ function ArchivePage() {
   const [q, setQ] = useState("");
   const archived = useMemo(() => (data ?? []).filter((j) => !isActiveJob(j)), [data]);
   const list = archived.filter((j) => {
-    const life = lifecycleOf(j);
-    if (filter === "completed" && life !== "completed") return false;
-    if (filter === "cancelled" && life !== "cancelled") return false;
     if (filter === "project" && j.job_type === "service") return false;
     if (filter === "service" && j.job_type !== "service") return false;
     const s = q.trim().toLowerCase();
@@ -42,23 +39,21 @@ function ArchivePage() {
   return (
     <div>
       <PageHeader title="Archiv" />
-      <p className="mb-3 text-sm text-muted-foreground">Abgeschlossen und abgesagt – Daten bleiben erhalten.</p>
-      <div className="relative mb-3">
+      <p className="mb-4 text-sm text-muted-foreground">Abgeschlossene und abgesagte Aufträge.</p>
+      <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kunde, Titel, Adresse oder Rapportnummer" className="h-12 bg-card pl-10 text-base" />
       </div>
-      <div className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1">
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
         {([
           ["all", "Alle"],
-          ["completed", "Abgeschlossen"],
-          ["cancelled", "Abgesagt"],
           ["project", "Projekte"],
-          ["service", "Regie"],
+          ["service", "Regie / Service"],
         ] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setFilter(k)}
-            className={`h-10 shrink-0 rounded-full border px-4 text-sm font-medium ${filter === k ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}
+            className={`h-10 rounded-lg px-2 text-sm font-medium ${filter === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}
           >
             {l}
           </button>

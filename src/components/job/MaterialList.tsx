@@ -89,7 +89,7 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
   );
 }
 
-export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Draft) => void }) {
+export function MaterialList({ jobId, onEdit, readOnly }: { jobId: string; onEdit: (m: Draft) => void; readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data } = useMaterials(jobId);
   const cats = useQuery(categoriesQuery());
@@ -130,7 +130,7 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
         const prod = Array.isArray(raw) ? raw[0] : raw;
         return (
         <div key={m.id} className="rounded-xl border bg-card p-3">
-          <button onClick={() => onEdit(m)} className="block w-full text-left">
+          <button onClick={() => !readOnly && onEdit(m)} className="block w-full text-left">
             <div className="mb-1 flex items-center justify-between gap-2">
               <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">{catName(m.category_id)}</span>
               <StatusBadge status={displayMaterialStatus(m.status)} />
@@ -146,12 +146,15 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
             {prod && <div className="mt-1 text-sm font-medium text-primary">Produkt: {prod.name}</div>}
             {m.confidence && <div className="mt-1 text-[11px] font-semibold text-muted-foreground">KI-Vorschlag · Sicherheit: {m.confidence}</div>}
           </button>
+          {!readOnly && (
           <button
             onClick={() => setSearchFor(m)}
             className="mt-2 h-10 w-full rounded-lg border border-primary text-sm font-semibold text-primary"
           >
             Produkt auswählen
           </button>
+          )}
+          {!readOnly && (
           <div className="mt-2 flex justify-end gap-1 border-t pt-2">
             <IconBtn label="Nach oben" onClick={() => move(i, -1)} disabled={i === 0}><ArrowUp className="h-4 w-4" /></IconBtn>
             <IconBtn label="Nach unten" onClick={() => move(i, 1)} disabled={i === list.length - 1}><ArrowDown className="h-4 w-4" /></IconBtn>
@@ -159,6 +162,7 @@ export function MaterialList({ jobId, onEdit }: { jobId: string; onEdit: (m: Dra
             <IconBtn label="Bearbeiten" onClick={() => onEdit(m)}><Pencil className="h-4 w-4" /></IconBtn>
             <IconBtn label="Löschen" onClick={() => remove(m)} danger><Trash2 className="h-4 w-4" /></IconBtn>
           </div>
+          )}
         </div>
         );
       })}

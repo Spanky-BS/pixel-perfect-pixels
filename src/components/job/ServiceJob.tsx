@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, Clock, Package, FileUp, CheckCircle2, Plus, Camera, Mic } from "lucide-react";
+import { FileText, FileUp, CheckCircle2, Camera, Mic, Pencil } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesUpdate } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 } from "@/components/job/ServiceSections";
 import { Row } from "@/components/job/Kalkulation";
 import { ServiceReportAction } from "@/components/job/ServiceReport";
-import { address, displayServiceStatus, formatCHF, formatDate, servicePhotoCategory, signedUrls, uploadMedia, type Customer, type Job } from "@/lib/app";
+import { address, customerName, displayServiceStatus, formatCHF, formatDate, servicePhotoCategory, signedUrls, uploadMedia, type Customer, type Job } from "@/lib/app";
 import { isTravelLabour, serviceBill } from "@/lib/service-billing";
 import { cancelJob } from "@/lib/lifecycle";
 import { settingsQuery } from "@/lib/queries";
@@ -60,14 +61,14 @@ export function ServiceJobView({
 
   return (
     <>
-      <div className="sticky top-14 z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur">
-        <div className="flex gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+      <div className="sticky top-14 z-20 -mx-4 border-b border-border/80 bg-background px-4">
+        <div className="grid grid-cols-4">
           {SECTIONS.map(([k, l]) => (
             <button
               key={k}
               type="button"
               onClick={() => setSection(k)}
-              className={`h-10 min-w-0 flex-1 shrink-0 whitespace-nowrap rounded-md px-2 text-xs font-semibold ${section === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}
+              className={`h-12 text-sm font-medium ${section === k ? "border-b-2 border-primary text-primary" : "text-muted-foreground"}`}
             >
               {l}
             </button>
@@ -79,51 +80,64 @@ export function ServiceJobView({
         <div className="space-y-6">
           <ServiceAiCapture jobId={job.id} onPhotoFiles={onPhotoFiles} />
 
-          <section className="space-y-2">
-            <h2 className="section-title">Manuell erfassen</h2>
-            <div className="grid grid-cols-1 gap-2">
-              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-semibold" onClick={() => setLabourStart("work")}>
-                <Clock className="h-4 w-4 text-primary" /> Arbeitszeit erfassen
+          <section className="space-y-1">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="min-w-0 flex-1 text-base font-semibold leading-snug">Ausgeführte Arbeiten & Arbeitszeit</h2>
+              <button type="button" className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary" onClick={() => setLabourStart("work")}>
+                + Hinzufügen
               </button>
-              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-semibold" onClick={() => setMatStart(true)}>
-                <Package className="h-4 w-4 text-primary" /> Material erfassen
+            </div>
+            <div className="rounded-lg border border-border/80 bg-card px-3">
+              <ServiceLabour jobId={job.id} hideQuickActions startWith={labourStart} onStarted={() => setLabourStart(null)} />
+            </div>
+          </section>
+
+          <section className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">Material</h2>
+              <button type="button" className="inline-flex h-10 items-center text-sm font-medium text-primary" onClick={() => setMatStart(true)}>
+                + Hinzufügen
               </button>
-              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-semibold" onClick={() => setExtraStart("Sonstiges")}>
-                <Plus className="h-4 w-4 text-primary" /> Zusatzkosten erfassen
+            </div>
+            <div className="rounded-lg border border-border/80 bg-card px-3">
+              <ServiceMaterial jobId={job.id} hideQuickActions startWith={matStart} onStarted={() => setMatStart(false)} />
+            </div>
+          </section>
+
+          <section className="space-y-1">
+            <div className="flex items-start justify-between gap-3">
+              <h2 className="min-w-0 flex-1 text-base font-semibold leading-snug">Fahrzeugpauschale / Zusatzkosten</h2>
+              <button type="button" className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary" onClick={() => setExtraStart("Sonstiges")}>
+                + Hinzufügen
               </button>
-              <button type="button" className="flex h-11 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-semibold" onClick={() => setVehicleStart(true)}>
-                Fahrzeugpauschale bearbeiten
-              </button>
+            </div>
+            <div className="rounded-lg border border-border/80 bg-card px-3">
+              <ServiceVehicleFee jobId={job.id} startEdit={vehicleStart} onStarted={() => setVehicleStart(false)} />
+              <ServiceExtras jobId={job.id} hideQuickActions startWith={extraStart} onStarted={() => setExtraStart(null)} />
             </div>
           </section>
 
           <section className="space-y-3">
-            <h2 className="section-title">Erfasste Positionen</h2>
-            <ServiceLabour jobId={job.id} hideQuickActions startWith={labourStart} onStarted={() => setLabourStart(null)} />
-            <ServiceMaterial jobId={job.id} hideQuickActions startWith={matStart} onStarted={() => setMatStart(false)} />
-            <ServiceVehicleFee jobId={job.id} startEdit={vehicleStart} onStarted={() => setVehicleStart(false)} />
-            <ServiceExtras jobId={job.id} hideQuickActions startWith={extraStart} onStarted={() => setExtraStart(null)} />
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="section-title">Dokumentation hinzufügen</h2>
-            <div className="grid grid-cols-4 gap-1.5">
-              <button type="button" className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border bg-muted/40 text-[10px] font-medium text-muted-foreground" onClick={onCamera}>
+            <h2 className="text-base font-semibold">Fotos & Dokumentation</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className="flex h-12 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-medium" onClick={onCamera}>
                 <Camera className="h-4 w-4" /> Foto
               </button>
-              <button type="button" className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border bg-muted/40 text-[10px] font-medium text-muted-foreground" onClick={onVoice}>
-                <Mic className="h-4 w-4" /> Sprachnotiz
-              </button>
-              <button type="button" className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border bg-muted/40 text-[10px] font-medium text-muted-foreground" onClick={onText}>
-                <FileText className="h-4 w-4" /> Textnotiz
-              </button>
-              <button type="button" className="flex h-11 flex-col items-center justify-center gap-0.5 rounded-lg border bg-muted/40 text-[10px] font-medium text-muted-foreground" onClick={onUpload}>
+              <button type="button" className="flex h-12 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-medium" onClick={onUpload}>
                 <FileUp className="h-4 w-4" /> Datei
               </button>
             </div>
-            <PhotoGallery jobId={job.id} variant="service" />
-            <NotesList jobId={job.id} />
-            <DocumentList jobId={job.id} />
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" className="flex h-11 items-center justify-center gap-1.5 text-sm font-medium text-muted-foreground" onClick={onVoice}>
+                <Mic className="h-4 w-4" /> Sprachnotiz
+              </button>
+              <button type="button" className="flex h-11 items-center justify-center gap-1.5 text-sm font-medium text-muted-foreground" onClick={onText}>
+                <FileText className="h-4 w-4" /> Textnotiz
+              </button>
+            </div>
+            <PhotoGallery jobId={job.id} variant="service" hideEmpty />
+            <NotesList jobId={job.id} hideEmpty />
+            <DocumentList jobId={job.id} hideEmpty />
           </section>
         </div>
       )}
@@ -134,24 +148,111 @@ export function ServiceJobView({
 }
 
 function ServiceAuftrag({ job }: { job: ServiceJob }) {
+  const [editing, setEditing] = useState(false);
   const c = job.customers;
+  const person = [c?.first_name, c?.last_name].filter(Boolean).join(" ");
+  const wish = (job.customer_request || job.problem_description || "").trim();
+  const showProblem = !!(
+    job.problem_description?.trim() &&
+    job.customer_request?.trim() &&
+    job.customer_request.trim() !== job.problem_description.trim()
+  );
+
   return (
     <div className="space-y-4">
-      <section className="space-y-2 rounded-xl border bg-card p-4 text-sm">
-        <h2 className="section-title">Auftrag</h2>
-        {job.report_number && <p><span className="font-semibold">Rapportnummer: </span>{job.report_number}</p>}
-        {job.problem_description && <p><span className="font-semibold">Problem: </span>{job.problem_description}</p>}
-        {job.customer_request && <p><span className="font-semibold">Kundenwunsch: </span>{job.customer_request}</p>}
-        {address(job) && <p className="text-muted-foreground">{address(job)}</p>}
-        {c?.phone && <p><a className="font-medium text-primary" href={`tel:${c.phone}`}>{c.phone}</a></p>}
-        {job.appointment_at && <p>Termin {formatDate(job.appointment_at, true)}</p>}
-        {!job.problem_description && !job.customer_request && (
-          <p className="text-muted-foreground">Noch kein Auftragstext – unten ergänzen.</p>
-        )}
+      <div className="flex items-start justify-between gap-3 pt-1">
+        <div>
+          <h2 className="text-lg font-semibold">Auftrag</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Briefing vor dem Einsatz</p>
+        </div>
+        <button
+          type="button"
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 px-2 text-sm font-medium text-primary"
+          onClick={() => setEditing(true)}
+        >
+          <Pencil className="h-4 w-4" /> Bearbeiten
+        </button>
+      </div>
+
+      <section className="bg-card">
+        <h3 className="px-0 pb-2 text-sm font-semibold text-muted-foreground">Auftragsinformationen</h3>
+        <dl className="border-y border-border/80">
+          <InfoRow label="Kunde">
+            {c ? (
+              <Link to="/kunden/$id" params={{ id: c.id }} className="font-medium text-primary">
+                {customerName(c)}
+              </Link>
+            ) : (
+              "Ohne Kunde"
+            )}
+          </InfoRow>
+          <InfoRow label="Einsatzort">
+            {address(job) ? (
+              <a href={`https://maps.apple.com/?q=${encodeURIComponent(address(job))}`} className="font-medium">
+                {address(job)}
+              </a>
+            ) : (
+              "–"
+            )}
+          </InfoRow>
+          <InfoRow label="Kontakt">
+            {c?.phone || (c?.company_name && person) ? (
+              <span className="font-medium">
+                {c?.company_name && person ? <span>{person}{c.phone ? " · " : ""}</span> : null}
+                {c?.phone ? <a href={`tel:${c.phone}`} className="text-primary">{c.phone}</a> : null}
+              </span>
+            ) : (
+              "–"
+            )}
+          </InfoRow>
+          <InfoRow label="Termin">
+            {job.appointment_at ? formatDate(job.appointment_at, true).replace(",", " ·") : "Noch nicht gesetzt"}
+          </InfoRow>
+          {job.report_number && <InfoRow label="Rapport">{job.report_number}</InfoRow>}
+        </dl>
+
+        <div className="space-y-1.5 py-4">
+          <h3 className="text-sm font-semibold text-muted-foreground">Kundenwunsch</h3>
+          {wish ? (
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{showProblem ? job.customer_request : wish}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Noch kein Kundenwunsch erfasst.</p>
+          )}
+          {showProblem && (
+            <div className="space-y-1 pt-3">
+              <h4 className="text-sm font-medium text-muted-foreground">Problem</h4>
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{job.problem_description}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1.5 border-t border-border/80 py-4">
+          <h3 className="text-sm font-semibold text-muted-foreground">Interne Notiz</h3>
+          {job.internal_notes?.trim() ? (
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{job.internal_notes}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Keine interne Notiz.</p>
+          )}
+        </div>
       </section>
-      <ServiceOrder job={job} />
-      <PhotoGallery jobId={job.id} variant="service" />
-      <DocumentList jobId={job.id} />
+
+      <Sheet open={editing} onOpenChange={setEditing}>
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
+          <SheetHeader><SheetTitle>Auftrag bearbeiten</SheetTitle></SheetHeader>
+          <div className="p-4 pt-0">
+            <ServiceOrder key={job.updated_at} job={job} onSaved={() => setEditing(false)} />
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
+  );
+}
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[6.75rem_1fr] items-baseline gap-x-3 border-b border-border/60 py-2.5 text-sm last:border-b-0">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words">{children}</dd>
     </div>
   );
 }

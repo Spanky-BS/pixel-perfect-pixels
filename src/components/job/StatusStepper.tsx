@@ -3,21 +3,19 @@ import { Check } from "lucide-react";
 import { normalizeStatus, stepLabel, stepsFor } from "@/lib/app";
 
 /**
- * Workflow stepper. Clicking a step only changes view (`onSelect`).
- * Persisted job status is advanced only via `onAdvance` (e.g. «Weiter zu …»).
+ * Workflow stepper. Clicking a step only changes the view (`onSelect`).
+ * Persisted job status is never changed here — only explicit business actions do that.
  */
 export function StatusStepper({
   type,
   status,
   selected,
   onSelect,
-  onAdvance,
 }: {
   type: string;
   status: string;
   selected?: string;
   onSelect: (s: string) => void;
-  onAdvance: (s: string) => void;
 }) {
   const steps = stepsFor(type);
   const persisted = normalizeStatus(type, status);
@@ -31,14 +29,11 @@ export function StatusStepper({
     el?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [viewIdx]);
 
-  const next = steps[persistedIdx + 1];
-  const canAdvance = !!next && next !== "Abgeschlossen";
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+    <div className="space-y-3 border-t border-border/60 pt-4">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>Schritt {viewIdx + 1} von {steps.length}</span>
-        <span className="font-semibold text-foreground">{stepLabel(type, steps[viewIdx] ?? view)}</span>
+        <span className="font-medium text-foreground">{stepLabel(type, steps[viewIdx] ?? view)}</span>
       </div>
       <div className="flex gap-1">
         {steps.map((s, i) => (
@@ -51,9 +46,9 @@ export function StatusStepper({
           const viewing = i === viewIdx;
           const current = i === persistedIdx;
           const activeStyle = current && viewing
-            ? "bg-primary text-primary-foreground shadow-[var(--shadow-primary)]"
+            ? "bg-primary text-primary-foreground"
             : viewing
-              ? "bg-card text-primary ring-2 ring-primary"
+              ? "bg-card text-primary ring-1 ring-primary"
               : done
                 ? "bg-primary/10 text-primary"
                 : "bg-muted text-muted-foreground";
@@ -63,7 +58,7 @@ export function StatusStepper({
               type="button"
               data-step={i}
               onClick={() => onSelect(s)}
-              className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-semibold transition-transform active:scale-95 ${activeStyle}`}
+              className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors ${activeStyle}`}
             >
               {done && !viewing ? <Check className="h-4 w-4" /> : <span className="text-xs opacity-70">{i + 1}</span>}
               {stepLabel(type, s)}
@@ -71,15 +66,6 @@ export function StatusStepper({
           );
         })}
       </div>
-      {canAdvance && next && (
-        <button
-          type="button"
-          onClick={() => onAdvance(next)}
-          className="action-tile-primary min-h-0 h-12 w-full flex-row text-base"
-        >
-          Weiter zu «{stepLabel(type, next)}» →
-        </button>
-      )}
     </div>
   );
 }

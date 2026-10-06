@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { MapPin, ChevronRight } from "lucide-react";
-import { JOB_TYPE_LABEL, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Customer, type Job } from "@/lib/app";
+import { JOB_TYPE_LABEL, address, customerName, displayServiceStatus, normalizeStatus, type Customer, type Job } from "@/lib/app";
 import { StatusBadge } from "./Brand";
-import { archiveDate, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
+import { lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
 
 export type JobWithCustomer = Job & { customers: Pick<Customer, "company_name" | "first_name" | "last_name"> | null };
 
@@ -12,26 +12,17 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
   const badge = job.job_type === "service"
     ? displayServiceStatus(job.status)
     : life === "active" ? normalizeStatus(job.job_type, job.status) : lifecycleLabel(life);
-  const when = life === "active" ? `Bearbeitet ${formatDate(job.updated_at, true)}` : `${lifecycleLabel(life)} ${formatDate(archiveDate(job), true)}`;
   return (
     <Link
       to="/baustellen/$id"
       params={{ id: job.id }}
-      className="surface flex items-center gap-3 p-4 transition-transform active:scale-[0.98]"
+      className="surface flex min-h-[116px] items-center gap-3 p-4 transition-colors active:bg-muted/30"
     >
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {customerName(job.customers)}
-          </span>
-          <span className="flex shrink-0 items-center gap-1">
-            <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${job.job_type === "service" ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{job.job_type === "service" ? "Regie" : JOB_TYPE_LABEL.project}</span>
-            <StatusBadge status={badge} />
-          </span>
-        </div>
-        <div className="truncate text-base font-semibold">{job.title}</div>
+        <div className="truncate text-sm text-muted-foreground">{customerName(job.customers)}</div>
+        <div className="mt-0.5 truncate text-base font-semibold">{job.title}</div>
         {job.job_type === "service" && job.report_number && (
-          <div className="mt-0.5 truncate text-sm font-medium text-primary">{job.report_number}</div>
+          <div className="mt-0.5 truncate text-sm text-primary">{job.report_number}</div>
         )}
         {addr && (
           <div className="mt-1 flex items-center gap-1 truncate text-sm text-muted-foreground">
@@ -39,9 +30,14 @@ export function JobCard({ job }: { job: JobWithCustomer }) {
             <span className="truncate">{addr}</span>
           </div>
         )}
-        <div className="mt-1 text-xs text-muted-foreground">{when}</div>
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className={`rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${job.job_type === "service" ? "bg-warning/15 text-foreground" : "bg-primary/[0.08] text-primary"}`}>
+            {job.job_type === "service" ? "Regie" : JOB_TYPE_LABEL.project}
+          </span>
+          <StatusBadge status={badge} />
+        </div>
       </div>
-      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/60" />
     </Link>
   );
 }

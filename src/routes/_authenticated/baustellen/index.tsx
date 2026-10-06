@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { JobCard } from "@/components/JobCard";
 import { PageHeader } from "@/components/Brand";
+import { Input } from "@/components/ui/input";
 import { customersQuery, jobsQuery } from "@/lib/queries";
-import { ACTIVE_PROJECT_STEPS, ACTIVE_SERVICE_STEPS, customerName, normalizeStatus } from "@/lib/app";
+import { address, customerName } from "@/lib/app";
 import { isActiveJob } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/_authenticated/baustellen/")({
@@ -21,45 +22,56 @@ export const Route = createFileRoute("/_authenticated/baustellen/")({
 });
 
 type TypeFilter = "all" | "project" | "service";
+type LifecycleFilter = "all" | "active" | "archived";
 
 function JobsPage() {
   const { data, isLoading } = useQuery(jobsQuery());
   const customers = useQuery(customersQuery());
   const [type, setType] = useState<TypeFilter>("all");
-  const [status, setStatus] = useState("Alle");
+  const [lifecycle, setLifecycle] = useState<LifecycleFilter>("active");
+  const [q, setQ] = useState("");
   const [customer, setCustomer] = useState("");
-  const statuses = type === "service" ? ACTIVE_SERVICE_STEPS : type === "project" ? ACTIVE_PROJECT_STEPS : [...new Set([...ACTIVE_PROJECT_STEPS, ...ACTIVE_SERVICE_STEPS])];
-  const list = (data ?? []).filter((j) =>
-    isActiveJob(j) &&
-    (type === "all" || j.job_type === type) &&
-    (status === "Alle" || normalizeStatus(j.job_type, j.status) === status) &&
-    (!customer || j.customer_id === customer),
-  );
+  const search = q.trim().toLowerCase();
+  const list = (data ?? []).filter((j) => {
+    const active = isActiveJob(j);
+    return (
+      (type === "all" || j.job_type === type) &&
+      (lifecycle === "all" || (lifecycle === "active" ? active : !active)) &&
+      (!customer || j.customer_id === customer) &&
+      (!search || [j.title, customerName(j.customers), address(j), j.report_number].join(" ").toLowerCase().includes(search))
+    );
+  });
   return (
     <div>
       <PageHeader
         title="Aufträge"
         action={
-          <Link to="/baustellen/neu" className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 font-semibold text-primary-foreground">
+          <Link to="/baustellen/neu" className="flex h-11 items-center gap-1 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">
             <Plus className="h-5 w-5" /> Neu
           </Link>
         }
       />
-      <div className="mb-3 grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
+      <div className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
         {([["all", "Alle"], ["project", "Projekte"], ["service", "Regie / Service"]] as const).map(([k, l]) => (
-          <button key={k} onClick={() => { setType(k); setStatus("Alle"); }} className={`h-10 rounded-md text-sm font-semibold ${type === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>{l}</button>
+          <button key={k} onClick={() => setType(k)} className={`h-10 rounded-lg text-sm font-medium ${type === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>{l}</button>
         ))}
       </div>
-      <div className="-mx-4 mb-3 flex gap-2 overflow-x-auto px-4 pb-1">
-        {["Alle", ...statuses].map((s) => (
-          <button key={s} onClick={() => setStatus(s)}
-            className={`h-10 shrink-0 rounded-full border px-4 text-sm font-medium ${status === s ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}>{s}</button>
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+        {([["all", "Alle"], ["active", "Aktiv"], ["archived", "Archiviert"]] as const).map(([k, label]) => (
+          <button key={k} onClick={() => setLifecycle(k)}
+            className={`h-10 rounded-lg text-sm font-medium ${lifecycle === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}>{label}</button>
         ))}
       </div>
-      <select value={customer} onChange={(e) => setCustomer(e.target.value)} className="mb-4 h-12 w-full rounded-md border border-input bg-card px-3 text-base">
-        <option value="">Alle Kunden</option>
-        {customers.data?.map((c) => <option key={c.id} value={c.id}>{customerName(c)}</option>)}
-      </select>
+      <div className="mb-4 space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Auftrag, Kunde oder Rapportnummer" className="h-12 bg-card pl-10 text-base" />
+        </div>
+        <select value={customer} onChange={(e) => setCustomer(e.target.value)} className="h-12 w-full rounded-lg border border-input bg-card px-3 text-base">
+          <option value="">Alle Kunden</option>
+          {customers.data?.map((c) => <option key={c.id} value={c.id}>{customerName(c)}</option>)}
+        </select>
+      </div>
       <div className="space-y-3">
         {isLoading && <p className="text-sm text-muted-foreground">Laden…</p>}
         {list.map((j) => <JobCard key={j.id} job={j} />)}

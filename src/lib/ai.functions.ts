@@ -321,3 +321,144 @@ export const extractServiceCapture = createServerFn({ method: "POST" })
       notes: String(out.abschlussnotiz ?? "").trim(),
     };
   });
+
+const PROJECT_EXEC_SYSTEM = `Du erfasst die Ausführung eines Sanitär-Projekts in der Schweiz (Haustechnik Nordwestschweiz).
+Der Techniker beschreibt die erledigte Arbeit frei (Sprache oder Text). Du ordnest IST-Stunden den bestehenden Offertpositionen zu.
+Erfinde KEINE Offertpositionen. Wenn etwas nicht zur Offerte passt, ist es Zusatzarbeit.
+Material nur, wenn ausdrücklich erwähnt. Keine Preise erfinden.
+Antworte auf Deutsch (Schweiz, ohne ß).`;
+
+const projectExecTool = {
+  type: "function" as const,
+  function: {
+    name: "erfasste_ausfuehrung",
+    description: "IST-Stunden und Material der Ausführung, zugeordnet zu Offertpositionen",
+    parameters: {
+      type: "object",
+      properties: {
+        arbeit: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              position: { type: "string", description: "Name der Offertposition oder Zusatzarbeit" },
+              stunden: { type: "number" },
+              notiz: { type: "string" },
+              zusatz: { type: "boolean" },
+            },
+            required: ["position", "stunden"],
+          },
+        },
+        material: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              beschreibung: { type: "string" },
+              menge: { type: "number" },
+              einheit: { type: "string" },
+            },
+            required: ["beschreibung"],
+          },
+        },
+      },
+      required: ["arbeit", "material"],
+    },
+  },
+};
+
+export type ProjectExecutionProposal = {
+  labour: Array<{ labourItemId: string | null; description: string; hours: number; note: string; extra: boolean }>;
+  material: Array<{ materialId: string | null; description: string; quantity: number; unit: string }>;
+};
+
+export const extractProjectExecution = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    jobId: z.string().uuid(),
+    extraText: z.string().optional(),
+    usePhotos: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }): Promise<ProjectExecutionProposal> => {
+    const sb = context.supabase;
+    const [{ data: job }, { data: notes }, { data: labourRows }, { data: matRows }, { data: photos }] = await Promise.all([
+      sb.from("jobs").select("title").eq("id", data.jobId).maybeSingle(),
+      sb.from("voice_notes").select("kind, transcript").eq("job_id", data.jobId).order("created_at"),
+      sb.from("labour_items").select("id, description, hours, source").eq("job_id", data.jobId).order("sort_order"),
+      sb.from("material_requirements").select("id, description, quantity, unit").eq("job_id", data.jobId).order("sort_order"),
+      data.usePhotos
+        ? sb.from("job_photos").select("storage_path").eq("job_id", data.jobId).order("taken_at", { ascending: false }).limit(4)
+        : Promise.resolve({ data: [] as { storage_path: string }[] }),
+    ]);
+    if (!job) throw new Error("Auftrag nicht gefunden");
+    const quoted = (labourRows ?? []).filter((l) => l.source !== "execution");
+    const positions = quoted.map((l) => `- ${l.description} (Offerte ${Number(l.hours)} h)`).join("\n") || "(keine Offertpositionen)";
+    const mats = (matRows ?? []).map((m) => `- ${m.description} (${Number(m.quantity)} ${m.unit})`).join("\n") || "(kein Offertmaterial)";
+
+    const text = [
+      `Projekt: ${job.title}`,
+      `Offertpositionen:\n${positions}`,
+      `Offertmaterial:\n${mats}`,
+      ...(notes ?? []).filter((n) => n.transcript).map((n) => `${n.kind === "voice" ? "Sprache" : "Text"}: ${n.transcript}`),
+      data.extraText?.trim() && `Aktuelle Beschreibung: ${data.extraText.trim()}`,
+      data.usePhotos && "Fotos liegen bei. Nur sichtbare, eindeutige Angaben übernehmen.",
+    ].filter(Boolean).join("\n");
+    const imagePaths = (photos ?? []).map((p) => p.storage_path);
+    if (!text.replace(`Projekt: ${job.title}`, "").replace(`Offertpositionen:\n${positions}`, "").trim() && !imagePaths.length) {
+      throw new Error("Keine Beschreibung – bitte Sprache, Text oder Foto erfassen");
+    }
+
+    const content: Array<Record<string, unknown>> = [{ type: "text", text }];
+    if (imagePaths.length) {
+      const { data: urls } = await sb.storage.from("job-media").createSignedUrls(imagePaths, 600);
+      urls?.forEach((u) => u.signedUrl && content.push({ type: "image_url", image_url: { url: u.signedUrl } }));
+    }
+
+    const { toolArguments } = await completeChat({
+      system: PROJECT_EXEC_SYSTEM,
+      userContent: content,
+      tools: [projectExecTool],
+      toolName: "erfasste_ausfuehrung",
+    });
+    if (!toolArguments) throw new Error("Keine Auswertung erhalten");
+    const out = JSON.parse(toolArguments) as {
+      arbeit?: Array<{ position?: string; stunden?: number; notiz?: string; zusatz?: boolean }>;
+      material?: Array<{ beschreibung?: string; menge?: number; einheit?: string }>;
+    };
+
+    const labour = (out.arbeit ?? [])
+      .filter((a) => (a.position ?? "").trim())
+      .map((a) => {
+        const description = String(a.position).trim();
+        const extra = a.zusatz === true;
+        const scored = quoted
+          .map((l) => ({ l, score: nameOverlap(description, l.description) }))
+          .sort((x, y) => y.score - x.score);
+        const hit = !extra && scored[0] && scored[0].score >= 0.4 ? scored[0].l : null;
+        return {
+          labourItemId: hit?.id ?? null,
+          description: hit?.description ?? description,
+          hours: typeof a.stunden === "number" && Number.isFinite(a.stunden) ? a.stunden : 1,
+          note: String(a.notiz ?? "").trim(),
+          extra: extra || !hit,
+        };
+      });
+
+    const material = (out.material ?? [])
+      .filter((m) => (m.beschreibung ?? "").trim())
+      .map((m) => {
+        const description = String(m.beschreibung).trim();
+        const scored = (matRows ?? [])
+          .map((p) => ({ p, score: nameOverlap(description, p.description) }))
+          .sort((x, y) => y.score - x.score);
+        const hit = scored[0] && scored[0].score >= 0.5 ? scored[0].p : null;
+        return {
+          materialId: hit?.id ?? null,
+          description: hit?.description ?? description,
+          quantity: typeof m.menge === "number" && Number.isFinite(m.menge) ? m.menge : 1,
+          unit: (m.einheit || hit?.unit || "Stk").trim() || "Stk",
+        };
+      });
+
+    return { labour, material };
+  });

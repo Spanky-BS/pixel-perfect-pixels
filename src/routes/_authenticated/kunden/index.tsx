@@ -37,15 +37,16 @@ function CustomersPage() {
         <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kunde suchen" className="h-12 bg-card pl-10 text-base" />
       </div>
-      <div className="divide-y rounded-xl border bg-card">
+      <div className="divide-y rounded-2xl border border-border/70 bg-card shadow-[var(--shadow-card)]">
         {isLoading && <p className="p-4 text-sm text-muted-foreground">Laden…</p>}
         {list.map((c) => (
-          <Link key={c.id} to="/kunden/$id" params={{ id: c.id }} className="flex min-h-16 items-center gap-3 px-4 py-3">
+          <Link key={c.id} to="/kunden/$id" params={{ id: c.id }} className="flex min-h-20 items-center gap-3 px-4 py-3.5">
             <div className="min-w-0 flex-1">
-              <div className="truncate font-semibold">{customerName(c)}</div>
-              <div className="truncate text-sm text-muted-foreground">{address(c) || c.phone}</div>
+              <div className="truncate font-medium">{customerName(c)}</div>
+              {address(c) && <div className="mt-0.5 truncate text-sm text-muted-foreground">{address(c)}</div>}
+              {(c.phone || c.email) && <div className="mt-0.5 truncate text-xs text-muted-foreground">{[c.phone, c.email].filter(Boolean).join(" · ")}</div>}
             </div>
-            <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            <ChevronRight className="h-5 w-5 text-muted-foreground/60" />
           </Link>
         ))}
         {!isLoading && !list.length && <p className="p-6 text-center text-sm text-muted-foreground">Keine Kunden.</p>}

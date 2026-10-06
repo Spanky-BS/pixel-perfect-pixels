@@ -143,7 +143,7 @@ function NewJob() {
 
 function TypeChooser({ kunde }: { kunde?: string | undefined }) {
   const opts = [
-    { typ: "project" as const, icon: HardHat, title: "Projekt / Baustelle", text: "Bestandesaufnahme, Analyse, optionale Grobkostenschätzung, Produktauswahl, Kalkulation, Offerte." },
+    { typ: "project" as const, icon: HardHat, title: "Projekt / Baustelle", text: "Begehung, Analyse, Grobkosten, Offerte, Ausführung, Abrechnung." },
     { typ: "service" as const, icon: Wrench, title: "Regie / Service", text: "Reparatur oder Service: Auftrag erfassen, effektive Stunden und Material, Abschluss." },
   ];
   return (

@@ -129,7 +129,7 @@ export const statusTone: Record<string, string> = {
 export type JobType = "project" | "service";
 export const JOB_TYPE_LABEL: Record<JobType, string> = { project: "Projekt", service: "Regie / Service" };
 
-export const PROJECT_STEPS = ["Begehung", "Analyse", "Grobkosten", "Produktauswahl", "Kalkulation", "Offerte", "Auftrag", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
+export const PROJECT_STEPS = ["Begehung", "Analyse", "Grobkosten", "Offerte", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
 /** Legacy persisted values; UI uses displayServiceStatus. */
 export const SERVICE_STEPS = ["Neu", "Geplant", "In Arbeit", "Erledigt", "Verrechnet"] as const;
 export const SERVICE_DISPLAY_STATUSES = ["Offen", "Erledigt", "Verrechnet", "Abgesagt"] as const;
@@ -140,7 +140,25 @@ export function stepLabel(type: string, step: string) {
   return type === "service" ? displayServiceStatus(step) : (PROJECT_STEP_LABEL[step] ?? step);
 }
 
-const LEGACY: Record<string, string> = { Neu: "Begehung", Aufnahme: "Begehung", Materialauswahl: "Produktauswahl" };
+const LEGACY: Record<string, string> = {
+  Neu: "Begehung",
+  Aufnahme: "Begehung",
+  Materialauswahl: "Offerte",
+  Produktauswahl: "Offerte",
+  Kalkulation: "Offerte",
+  Auftrag: "Ausführung",
+};
+
+export const STANDARD_WORK_POSITIONS = ["Demontage", "Schmutzwasser", "Warm- und Kaltwasser", "Endmontage", "Unvorhergesehenes"] as const;
+export const EXECUTION_SOURCE = "execution";
+export function isQuotedLabour(l: { source?: string | null }) {
+  return l.source !== EXECUTION_SOURCE;
+}
+export function isOfferLocked(status: string) {
+  const s = normalizeStatus("project", status);
+  const i = PROJECT_STEPS.indexOf(s as (typeof PROJECT_STEPS)[number]);
+  return i >= PROJECT_STEPS.indexOf("Ausführung");
+}
 const SERVICE_OPEN = new Set(["Neu", "Geplant", "In Arbeit", "Offen"]);
 
 export function displayServiceStatus(status: string) {
@@ -176,6 +194,6 @@ export function defaultTechnician(settings?: { default_technician?: string | nul
   const n = settings?.default_technician?.trim();
   return n || DEFAULT_TECHNICIAN;
 }
-export const ESTIMATE_DISCLAIMER = "Unverbindliche Grobkostenschätzung auf Basis der aktuellen Bestandesaufnahme und Kundenwünsche. Die definitive Offerte erfolgt nach Produktauswahl und Detailprüfung.";
+export const ESTIMATE_DISCLAIMER = "Unverbindliche Grobkostenschätzung auf Basis der aktuellen Bestandesaufnahme und Kundenwünsche. Die definitive Offerte folgt nach der Detailprüfung.";
 
 export const roundTo = (n: number, step = 100) => Math.round(n / step) * step;

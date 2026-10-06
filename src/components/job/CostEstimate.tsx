@@ -24,8 +24,8 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
   async function create() {
-    const { data: lab } = await supabase.from("labour_items").select("hours, hourly_rate").eq("job_id", jobId);
-    const labour = (lab ?? []).reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
+    const { data: lab } = await supabase.from("labour_items").select("hours, hourly_rate, source").eq("job_id", jobId);
+    const labour = (lab ?? []).filter((l) => l.source !== "execution").reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
     const { data, error } = await supabase.from("cost_estimates")
       .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: Number(settings.data?.estimate_tolerance ?? 20) })
       .select("id").single();
@@ -62,7 +62,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   if (!cur) {
     return (
       <div className="space-y-3 rounded-xl border border-dashed bg-card p-5 text-center">
-        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Produktauswahl.</p>
+        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte.</p>
         <button onClick={create} className="h-12 w-full rounded-lg bg-primary font-semibold text-primary-foreground">Grobkostenschätzung erstellen</button>
       </div>
     );

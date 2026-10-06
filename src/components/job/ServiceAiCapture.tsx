@@ -149,7 +149,7 @@ export function ServiceAiCapture({
     <button
       type="button"
       onClick={onClick}
-      className={`flex h-12 flex-col items-center justify-center gap-0.5 rounded-lg border text-xs font-semibold ${mode === id ? "border-primary bg-primary/10 text-primary" : "bg-card"}`}
+      className={`flex h-20 flex-col items-center justify-center gap-1.5 rounded-lg border text-sm font-medium transition-colors ${mode === id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground"}`}
     >
       {icon}{label}
     </button>
@@ -157,13 +157,15 @@ export function ServiceAiCapture({
 
   return (
     <div className="space-y-4">
-      <section className="space-y-3 rounded-xl border-2 border-primary/30 bg-card p-4">
-        <h2 className="section-title">Mit KI erfassen</h2>
-        <p className="text-xs text-muted-foreground">Sprache, Foto oder Text – Vorschläge erst nach Bestätigung speichern.</p>
+      <section className="space-y-4 rounded-xl border border-border/80 bg-card p-4">
+        <div>
+          <h2 className="text-lg font-semibold">Vor Ort erfassen</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Einmal erfassen – die KI strukturiert, du prüfst und übernimmst.</p>
+        </div>
         <div className="grid grid-cols-3 gap-2">
-          {methodBtn("sprache", <Mic className="h-4 w-4" />, "Sprache", () => { setMode("sprache"); setVoiceOpen(true); })}
-          {methodBtn("foto", <Camera className="h-4 w-4" />, "Foto", () => { setMode("foto"); images.openChooser(); })}
-          {methodBtn("text", <FileText className="h-4 w-4" />, "Text", () => setMode("text"))}
+          {methodBtn("sprache", <Mic className="h-6 w-6" />, "Sprache", () => { setMode("sprache"); setVoiceOpen(true); })}
+          {methodBtn("foto", <Camera className="h-6 w-6" />, "Foto", () => { setMode("foto"); images.openChooser(); })}
+          {methodBtn("text", <FileText className="h-6 w-6" />, "Text", () => setMode("text"))}
         </div>
         {images.chooser}
         {mode === "text" && (
@@ -188,9 +190,9 @@ export function ServiceAiCapture({
       </section>
 
       {hasProposal && (
-        <section className="space-y-3 rounded-xl border bg-card p-4">
+        <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
           <h2 className="section-title">KI-Vorschläge</h2>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">KI-Vorschlag – noch nicht gespeichert</p>
+          <p className="text-sm font-medium text-primary">Entwurf – noch nicht gespeichert</p>
           {labour.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-bold">Arbeit</h3>

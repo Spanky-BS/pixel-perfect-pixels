@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CustomerFields, emptyCustomer, useCustomerDraft } from "@/components/CustomerForm";
 import { JobCard, type JobWithCustomer } from "@/components/JobCard";
 import { customerName } from "@/lib/app";
+import { isActiveJob } from "@/lib/lifecycle";
 
 export const Route = createFileRoute("/_authenticated/kunden/$id")({
   head: () => ({
@@ -77,13 +78,15 @@ function CustomerPage() {
     qc.invalidateQueries({ queryKey: ["customers"] });
     navigate({ to: "/kunden" });
   }
+  const activeJobs = (jobs.data ?? []).filter(isActiveJob);
+  const previousJobs = (jobs.data ?? []).filter((job) => !isActiveJob(job));
 
   return (
     <div className="space-y-4">
       <Link to="/kunden" className="-ml-1 inline-flex h-10 items-center text-sm font-medium text-muted-foreground">
         <ChevronLeft className="h-5 w-5" /> Kunden
       </Link>
-      <h1 className="text-2xl font-bold">{isNew ? "Neuer Kunde" : customerName(customer.data)}</h1>
+      <h1 className="text-2xl font-semibold">{isNew ? "Neuer Kunde" : customerName(customer.data)}</h1>
       {!isNew && (customer.data?.phone || customer.data?.email) && (
         <div className="grid grid-cols-2 gap-3">
           {customer.data?.phone && <a href={`tel:${customer.data.phone}`} className="flex h-12 items-center justify-center gap-2 rounded-lg border bg-card font-medium"><Phone className="h-5 w-5 text-primary" /> Anrufen</a>}
@@ -91,12 +94,24 @@ function CustomerPage() {
         </div>
       )}
       {!isNew && (
-        <section className="space-y-3">
+        <section className="space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="section-title">Baustellen ({jobs.data?.length ?? 0})</h2>
-            <Link to="/baustellen/neu" search={{ kunde: id }} className="flex h-10 items-center gap-1 text-sm font-semibold text-primary"><Plus className="h-4 w-4" /> Neue Baustelle</Link>
+            <h2 className="section-title">Aufträge</h2>
+            <Link to="/baustellen/neu" search={{ kunde: id }} className="flex h-10 items-center gap-1 text-sm font-medium text-primary"><Plus className="h-4 w-4" /> Neuer Auftrag</Link>
           </div>
-          {jobs.data?.map((j) => <JobCard key={j.id} job={j} />)}
+          {activeJobs.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Aktiv</h3>
+              {activeJobs.map((j) => <JobCard key={j.id} job={j} />)}
+            </div>
+          )}
+          {previousJobs.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Bisherige Aufträge</h3>
+              {previousJobs.map((j) => <JobCard key={j.id} job={j} />)}
+            </div>
+          )}
+          {!jobs.isLoading && !jobs.data?.length && <p className="text-sm text-muted-foreground">Noch keine Aufträge.</p>}
         </section>
       )}
       <section className="rounded-xl border bg-card p-4">

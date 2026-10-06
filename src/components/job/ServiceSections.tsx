@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, FileText, CheckCircle2 } from "lucide-react";
+import { Trash2, Plus, FileText, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -97,18 +97,18 @@ export function ServiceLabour({
   const workTotal = work.reduce((s, r) => s + Number(r["hours"]) * Number(r["hourly_rate"]), 0);
 
   return (
-    <div className="space-y-3">
+    <div className={hideQuickActions ? "" : "space-y-3"}>
       {!hideQuickActions && (
         <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() })}><Plus className="h-6 w-6" />Arbeit erfassen</button>
       )}
-      <h3 className="text-sm font-bold">Arbeit</h3>
+      {hideQuickActions ? null : <h3 className="text-sm font-medium">Arbeit</h3>}
       {work.map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || "–")} right={formatCHF(Number(r["hours"]) * Number(r["hourly_rate"]))}
           sub={[`${Number(r["hours"])} h × ${formatCHF(Number(r["hourly_rate"]))}`, r["technician"] as string, r["start_at"] ? formatDate(r["start_at"] as string, true) : null].filter(Boolean).join(" · ")}
           onEdit={() => setD(r)} onDelete={async () => { await supabase.from("service_labour_entries").delete().eq("id", r.id!); refresh(); }} />
       ))}
       {!work.length && <Empty text="Noch keine Arbeitszeit erfasst." />}
-      <div className="rounded-lg bg-muted px-4 py-2"><Row label="Arbeitsstunden" value={`${workHours} h`} /><Row label="Arbeit total" value={formatCHF(workTotal)} bold /></div>
+      {work.length > 0 && <div className="rounded-lg bg-muted px-4 py-2"><Row label="Arbeitsstunden" value={`${workHours} h`} /><Row label="Arbeit total" value={formatCHF(workTotal)} bold /></div>}
 
       <EditSheet title="Arbeitszeit" row={d} onClose={() => setD(null)} onSave={async () => { await saveRow("service_labour_entries", d!); refresh(); setD(null); }}>
         {d && <>
@@ -159,17 +159,18 @@ export function ServiceMaterial({
     <Field label={label}><Input className="h-12 text-base" type="number" inputMode="decimal" step="any" value={d[k] == null ? "" : String(d[k])} onChange={(e) => setD({ ...d, [k]: e.target.value === "" ? null : Number(e.target.value) })} /></Field>
   );
   return (
-    <div className="space-y-3">
+    <div className={hideQuickActions ? "" : "space-y-3"}>
       {!hideQuickActions && (
         <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, quantity: 1, unit: "Stk", sales_price: 0 })}><Plus className="h-6 w-6" />Material erfassen</button>
       )}
+      {hideQuickActions ? null : <h3 className="text-sm font-medium">Material</h3>}
       {(mat.data ?? []).map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || "–")} right={formatCHF(Number(r["quantity"]) * Number(r["sales_price"]))}
           sub={[`${Number(r["quantity"])} ${r["unit"]} × ${formatCHF(Number(r["sales_price"]))}`, r["supplier"] as string, r["supplier_article_no"] as string].filter(Boolean).join(" · ")}
           onEdit={() => setD(r)} onDelete={async () => { await supabase.from("service_material_entries").delete().eq("id", r.id!); refresh(); }} />
       ))}
       {!mat.data?.length && <Empty text="Noch kein Material erfasst." />}
-      <div className="rounded-lg bg-muted px-4 py-2"><Row label="Material total" value={formatCHF(material)} bold /></div>
+      {(mat.data?.length ?? 0) > 0 && <div className="rounded-lg bg-muted px-4 py-2"><Row label="Material total" value={formatCHF(material)} bold /></div>}
       <EditSheet title="Material" row={d} onClose={() => setD(null)} onSave={async () => { await saveRow("service_material_entries", { ...d!, sales_price: Number(d!["sales_price"] ?? 0), quantity: Number(d!["quantity"] ?? 1) }); refresh(); setD(null); }}>
         {d && <>
           {txt("description", "Beschreibung", "z.B. Siphon 5/4\"")}
@@ -278,14 +279,13 @@ export function ServiceVehicleFee({ jobId, startEdit, onStarted }: { jobId: stri
   }
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-bold">Fahrzeug</h3>
-      <div className="flex items-center gap-2 rounded-xl border bg-card p-3">
+    <section className="border-b border-border/60 py-3">
+      <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <div className="font-semibold">{VEHICLE_KIND}</div>
-          <div className="font-mono text-sm">{formatCHF(value)}</div>
+          <div className="font-medium">{VEHICLE_KIND}</div>
+          <div className="font-mono text-sm text-muted-foreground">{formatCHF(value)}</div>
         </div>
-        <button type="button" className="flex h-10 items-center rounded-lg border px-3 text-sm font-medium" onClick={() => { setAmount(String(value)); setEditing(true); }}>
+        <button type="button" className="h-10 px-2 text-sm font-medium text-primary" onClick={() => { setAmount(String(value)); setEditing(true); }}>
           Bearbeiten
         </button>
       </div>
@@ -345,7 +345,7 @@ export function ServiceExtras({
           </div>
         </>
       )}
-      <h3 className="text-sm font-bold">Zusatzkosten</h3>
+      {hideQuickActions ? null : <h3 className="text-sm font-medium">Zusatzkosten</h3>}
       {other.map((r) => (
         <ItemCard key={r.id} title={String(r["description"] || r["kind"])} right={formatCHF(Number(r["quantity"]) * Number(r["price"]))}
           sub={`${Number(r["quantity"])} × ${formatCHF(Number(r["price"]))}`}
@@ -372,7 +372,7 @@ export function ServiceExtras({
 }
 
 // ---------- Auftrag (order capture) ----------
-export function ServiceOrder({ job }: { job: Job }) {
+export function ServiceOrder({ job, onSaved }: { job: Job; onSaved?: () => void }) {
   const qc = useQueryClient();
   const [d, setD] = useState({
     problem_description: job.problem_description ?? "", customer_request: job.customer_request ?? "", internal_notes: job.internal_notes ?? "", appointment_at: job.appointment_at,
@@ -383,14 +383,15 @@ export function ServiceOrder({ job }: { job: Job }) {
     toast.success("Gespeichert");
     qc.invalidateQueries({ queryKey: ["job", job.id] });
     qc.invalidateQueries({ queryKey: ["jobs"] });
+    onSaved?.();
   }
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-4">
+    <div className="space-y-3">
       <Field label="Problembeschreibung"><Textarea className="min-h-24 text-base" value={d.problem_description} onChange={(e) => setD({ ...d, problem_description: e.target.value })} placeholder="z.B. WC-Spülung läuft nach" /></Field>
       <Field label="Kundenwunsch"><Textarea className="min-h-20 text-base" value={d.customer_request} onChange={(e) => setD({ ...d, customer_request: e.target.value })} /></Field>
       <Field label="Termin (optional)"><Input className="h-12 text-base" type="datetime-local" value={toLocalInput(d.appointment_at)} onChange={(e) => setD({ ...d, appointment_at: fromLocalInput(e.target.value) })} /></Field>
       <Field label="Interne Notizen"><Textarea className="min-h-20 text-base" value={d.internal_notes} onChange={(e) => setD({ ...d, internal_notes: e.target.value })} /></Field>
-      <Button className="h-12 w-full font-semibold" onClick={save}>Speichern</Button>
+      <Button className="h-12 w-full font-medium" onClick={save}>Speichern</Button>
     </div>
   );
 }
@@ -501,19 +502,18 @@ export function SignaturePad({ onSave }: { onSave: (b: Blob) => void }) {
 // ---------- shared bits ----------
 function ItemCard({ title, sub, right, onEdit, onDelete }: { title: string; sub?: string; right: string; onEdit: () => void; onDelete: () => void }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border bg-card p-3">
-      <button onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <div className="flex items-baseline justify-between gap-2"><span className="truncate font-semibold">{title}</span><span className="shrink-0 font-mono text-sm">{right}</span></div>
+    <div className="flex items-center gap-2 border-b border-border/60 py-3 last:border-b-0">
+      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
+        <div className="flex items-baseline justify-between gap-2"><span className="truncate font-medium">{title}</span><span className="shrink-0 font-mono text-sm">{right}</span></div>
         {sub && <div className="mt-0.5 truncate text-sm text-muted-foreground">{sub}</div>}
       </button>
-      <button aria-label="Bearbeiten" onClick={onEdit} className="flex h-10 w-10 items-center justify-center rounded-lg border text-muted-foreground"><Pencil className="h-4 w-4" /></button>
-      <button aria-label="Löschen" onClick={() => confirm("Position löschen?") && onDelete()} className="flex h-10 w-10 items-center justify-center rounded-lg border text-destructive"><Trash2 className="h-4 w-4" /></button>
+      <button type="button" aria-label="Löschen" onClick={() => confirm("Position löschen?") && onDelete()} className="flex h-10 w-10 shrink-0 items-center justify-center text-destructive"><Trash2 className="h-4 w-4" /></button>
     </div>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">{text}</p>;
+  return <p className="py-1 text-sm text-muted-foreground">{text}</p>;
 }
 
 function EditSheet({ title, row, onClose, onSave, children }: { title: string; row: AnyRow | null; onClose: () => void; onSave: () => Promise<void>; children: React.ReactNode }) {

@@ -148,11 +148,13 @@ export function PhotoGallery({
   variant = "project",
   filterCategories,
   title,
+  hideEmpty,
 }: {
   jobId: string;
   variant?: "project" | "service";
   filterCategories?: string[];
   title?: string;
+  hideEmpty?: boolean;
 }) {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<JobPhoto | null>(null);
@@ -200,8 +202,8 @@ export function PhotoGallery({
 
   return (
     <section className="space-y-3">
-      <h2 className="section-title">{title ?? `Fotos (${list.length})`}</h2>
-      {!list.length && <p className="rounded-xl border border-dashed bg-card p-4 text-center text-sm text-muted-foreground">Noch keine Fotos.</p>}
+      {!(hideEmpty && !list.length) && <h2 className="section-title">{title ?? `Fotos (${list.length})`}</h2>}
+      {!list.length && !hideEmpty && <p className="rounded-xl border border-dashed bg-card p-4 text-center text-sm text-muted-foreground">Noch keine Fotos.</p>}
       {variant === "service" && !filterCategories ? (
         SERVICE_PHOTO_CATEGORIES.map((group) => {
           const items = list.filter((p) => servicePhotoCategory(p.category) === group);
@@ -248,7 +250,7 @@ export function PhotoGallery({
   );
 }
 
-export function NotesList({ jobId }: { jobId: string }) {
+export function NotesList({ jobId, hideEmpty }: { jobId: string; hideEmpty?: boolean }) {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<VoiceNote | null>(null);
   const notes = useQuery({
@@ -275,6 +277,7 @@ export function NotesList({ jobId }: { jobId: string }) {
   }
 
   const list = notes.data ?? [];
+  if (hideEmpty && !list.length) return null;
   return (
     <section className="space-y-3">
       <h2 className="section-title">Notizen & Sprachaufnahmen ({list.length})</h2>
@@ -389,7 +392,7 @@ export function useFileInputs({
   };
 }
 
-export function DocumentList({ jobId }: { jobId: string }) {
+export function DocumentList({ jobId, hideEmpty }: { jobId: string; hideEmpty?: boolean }) {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<JobDocument | null>(null);
   const docs = useQuery({
@@ -416,6 +419,7 @@ export function DocumentList({ jobId }: { jobId: string }) {
   }
 
   const list = docs.data ?? [];
+  if (hideEmpty && !list.length) return null;
   return (
     <section className="space-y-3">
       <h2 className="section-title">Unterlagen ({list.length})</h2>

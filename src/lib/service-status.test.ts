@@ -28,8 +28,14 @@ describe("service status mapping", () => {
     expect(lifecycleOf({ job_type: "service", status: "Abgesagt" })).toBe("cancelled");
   });
 
-  it("leaves project mapping unchanged", () => {
+  it("maps legacy project stages onto the simplified workflow", () => {
     expect(normalizeStatus("project", "Aufnahme")).toBe("Begehung");
+    expect(normalizeStatus("project", "Materialauswahl")).toBe("Offerte");
+    expect(normalizeStatus("project", "Produktauswahl")).toBe("Offerte");
+    expect(normalizeStatus("project", "Kalkulation")).toBe("Offerte");
+    expect(normalizeStatus("project", "Auftrag")).toBe("Ausführung");
+    expect(normalizeStatus("project", "Offerte")).toBe("Offerte");
+    expect(normalizeStatus("project", "Ausführung")).toBe("Ausführung");
     expect(isClosed("project", "Abgeschlossen")).toBe(true);
   });
 

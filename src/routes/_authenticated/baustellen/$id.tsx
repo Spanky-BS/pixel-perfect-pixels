@@ -16,11 +16,14 @@ import { settingsQuery } from "@/lib/queries";
 import { StatusStepper } from "@/components/job/StatusStepper";
 import { AiAnalysis, OpenQuestions } from "@/components/job/AiAnalysis";
 import { CostEstimate } from "@/components/job/CostEstimate";
-import { Kalkulation, Row } from "@/components/job/Kalkulation";
+import { Row } from "@/components/job/Kalkulation";
 import { Nachkalkulation } from "@/components/job/Nachkalkulation";
 import { SupplierInvoices } from "@/components/job/SupplierInvoices";
 import { ServiceJobView } from "@/components/job/ServiceJob";
-import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Labour, type Material } from "@/lib/app";
+import { OfferteWorkspace, QuoteTotalsCard } from "@/components/job/Offerte";
+import { AusfuehrungWorkspace } from "@/components/job/Ausfuehrung";
+import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Labour, type Material } from "@/lib/app";
+import { computeQuote } from "@/lib/project-quote";
 import { StatusBadge } from "@/components/Brand";
 import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
 import { unitSalesPrice } from "@/lib/products";
@@ -62,10 +65,15 @@ function JobPage() {
   const jobTypeRef = useRef(job.data?.job_type);
   jobTypeRef.current = job.data?.job_type;
 
+  const viewStepRef = useRef(selectedWorkflowStep);
+  viewStepRef.current = selectedWorkflowStep;
+  const persistedRef = useRef<string | null>(null);
+  persistedRef.current = job.data ? normalizeStatus(job.data.job_type, job.data.status) : null;
   const photos = usePhotoUpload(id, {
     defaultCategory: job.data?.job_type === "service" ? DEFAULT_SERVICE_PHOTO_CATEGORY : null,
     onUploaded: (ids) => {
-      if (jobTypeRef.current === "service") setAssignPhotoIds(ids);
+      const step = viewStepRef.current ?? persistedRef.current;
+      if (jobTypeRef.current === "service" || step === "Ausführung") setAssignPhotoIds(ids);
     },
   });
   const documents = useDocumentUpload(id);
@@ -103,20 +111,27 @@ function JobPage() {
   const addLabour = () => { setLab({ job_id: id, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) }); };
 
   const captureTiles = (
-    <>
+    <section className="space-y-4 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
+      <div>
+        <h2 className="text-lg font-semibold">Mit KI erfassen</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Einmal erfassen, danach in der Analyse strukturiert prüfen.</p>
+      </div>
       <div className="grid grid-cols-3 gap-2">
-        <button className="action-tile-primary" onClick={files.openCamera}><Camera className="h-7 w-7" />Foto</button>
         <button className="action-tile-primary" onClick={capture.openVoice}><Mic className="h-7 w-7" />Sprache</button>
+        <button className="action-tile-primary" onClick={files.openCamera}><Camera className="h-7 w-7" />Foto</button>
         <button className="action-tile-primary" onClick={capture.openText}><FileText className="h-7 w-7" />Text</button>
       </div>
       {!service && (
-        <div className="grid grid-cols-3 gap-2">
-          <SecBtn onClick={files.openUpload} icon={<FileUp className="h-4 w-4" />}>Datei / Unterlage hochladen</SecBtn>
-          <SecBtn onClick={addMaterial} icon={<Package className="h-4 w-4" />}>Material manuell</SecBtn>
-          <SecBtn onClick={addLabour} icon={<Wrench className="h-4 w-4" />}>Arbeit manuell</SecBtn>
+        <div className="space-y-2 border-t border-primary/10 pt-3">
+          <p className="text-sm font-medium text-muted-foreground">Manuell ergänzen</p>
+          <div className="grid grid-cols-3 gap-2">
+            <SecBtn onClick={files.openUpload} icon={<FileUp className="h-4 w-4" />}>Unterlage</SecBtn>
+            <SecBtn onClick={addMaterial} icon={<Package className="h-4 w-4" />}>Material</SecBtn>
+            <SecBtn onClick={addLabour} icon={<Wrench className="h-4 w-4" />}>Arbeit</SecBtn>
+          </div>
         </div>
       )}
-    </>
+    </section>
   );
 
   return (
@@ -124,14 +139,18 @@ function JobPage() {
       <Link to="/baustellen" className="-ml-1 inline-flex h-10 items-center text-sm font-medium text-muted-foreground">
         <ChevronLeft className="h-5 w-5" /> Aufträge
       </Link>
-      <div className="space-y-3 rounded-xl border bg-card p-4">
+      <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {c ? <Link to="/kunden/$id" params={{ id: c.id }} className="text-primary">{customerName(c)}</Link> : "Ohne Kunde"}
-          </span>
+          {service ? (
+            <span className="rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-warning/15 text-foreground">{JOB_TYPE_LABEL.service}</span>
+          ) : (
+            <span className="truncate text-sm text-muted-foreground">
+              {c ? <Link to="/kunden/$id" params={{ id: c.id }} className="text-primary">{customerName(c)}</Link> : "Ohne Kunde"}
+            </span>
+          )}
           <div className="flex shrink-0 items-center gap-1">
-            <span className={`rounded-md px-2 py-0.5 text-[11px] font-bold uppercase ${service ? "bg-warning/20 text-foreground" : "bg-primary/10 text-primary"}`}>{JOB_TYPE_LABEL[service ? "service" : "project"]}</span>
-            {service && <StatusBadge status={displayServiceStatus(j.status)} />}
+            {!service && <span className="rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-primary/[0.08] text-primary">{JOB_TYPE_LABEL.project}</span>}
+            <StatusBadge status={service ? displayServiceStatus(j.status) : persisted} />
             {isActiveJob(j) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -161,13 +180,13 @@ function JobPage() {
           </div>
         </div>
         <div>
-          <h1 className="text-xl font-bold leading-tight">{j.title}</h1>
-          {address(j) && (
+          <h1 className="text-2xl font-semibold leading-tight">{j.title}</h1>
+          {!service && address(j) && (
             <a href={`https://maps.apple.com/?q=${encodeURIComponent(address(j))}`} className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" /> {address(j)}
             </a>
           )}
-          {c?.phone && (
+          {!service && c?.phone && (
             <a href={`tel:${c.phone}`} className="mt-1 flex items-center gap-1 text-sm font-medium text-primary"><Phone className="h-4 w-4" /> {c.phone}</a>
           )}
         </div>
@@ -177,15 +196,7 @@ function JobPage() {
             status={j.status}
             selected={viewStep}
             onSelect={setSelectedWorkflowStep}
-            onAdvance={(s) => {
-              if (s === "Abgeschlossen") return;
-              setStatus(s);
-              setSelectedWorkflowStep(s);
-            }}
           />
-        )}
-        {service && j.appointment_at && (
-          <p className="text-sm text-muted-foreground">Termin {formatDate(j.appointment_at, true)}</p>
         )}
         {!service && !isActiveJob(j) && (
           <p className="rounded-lg bg-muted px-3 py-2 text-sm font-semibold">
@@ -195,19 +206,12 @@ function JobPage() {
             {lifecycleOf(j) === "cancelled" && j.cancelled_at ? ` · ${formatDate(j.cancelled_at, true)}` : ""}
           </p>
         )}
-        {!service && (
-          <div className="text-xs text-muted-foreground">
-            Erstellt {formatDate(j.created_at)} · Bearbeitet {formatDate(j.updated_at, true)}
-            {j.appointment_at && <> · Termin {formatDate(j.appointment_at, true)}</>}
-          </div>
-        )}
+        {!service && j.appointment_at && <p className="text-sm text-muted-foreground">Termin {formatDate(j.appointment_at, true)}</p>}
         {!service && j.internal_notes && <p className="rounded-lg bg-muted px-3 py-2 text-sm"><span className="font-semibold">Intern: </span>{j.internal_notes}</p>}
       </div>
       {files.inputs}
       {capture.sheets}
-      {service && (
-        <PhotoAssignSheet key={assignPhotoIds.join(",")} jobId={id} photoIds={assignPhotoIds} onClose={() => setAssignPhotoIds([])} />
-      )}
+      <PhotoAssignSheet key={assignPhotoIds.join(",")} jobId={id} photoIds={assignPhotoIds} onClose={() => setAssignPhotoIds([])} />
 
       {!service && (
         <ProjectStepContent
@@ -221,6 +225,28 @@ function JobPage() {
           onEditLabour={setLab}
           onViewSources={() => setSourcesOpen(true)}
           onAddPhoto={files.openCamera}
+          onPhotoFiles={photos}
+          onConfirmOffer={async () => {
+            const vatRate = Number(settings.data?.vat_rate ?? 8.1);
+            const { data: lab } = await supabase.from("labour_items").select("*").eq("job_id", id);
+            const { data: mat } = await supabase.from("material_requirements").select("*, products(*)").eq("job_id", id);
+            const totals = computeQuote(lab ?? [], mat ?? [], vatRate, Number(settings.data?.default_material_markup ?? 0));
+            const { error: qErr } = await supabase.from("quotations").insert({
+              job_id: id,
+              status: "Bestätigt",
+              total: totals.total,
+            });
+            if (qErr) return toast.error(qErr.message);
+            await setStatus("Ausführung");
+            setSelectedWorkflowStep("Ausführung");
+            toast.success("Offerte bestätigt – Ausführung");
+          }}
+          onTouchOfferte={async () => {
+            const current = normalizeStatus(j.job_type, j.status);
+            const curIdx = PROJECT_STEPS.indexOf(current as (typeof PROJECT_STEPS)[number]);
+            const offerIdx = PROJECT_STEPS.indexOf("Offerte");
+            if (curIdx >= 0 && curIdx < offerIdx) await setStatus("Offerte");
+          }}
           onComplete={async () => {
             if (!confirm("Projekt wirklich abschliessen? Es erscheint danach im Archiv.")) return;
             try {
@@ -248,8 +274,20 @@ function JobPage() {
         />
       )}
 
-      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "none"} draft={mat} onClose={() => setMat(null)} />
-      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "none"} draft={lab} onClose={() => setLab(null)} />
+      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "none"} draft={mat} onClose={() => {
+        setMat(null);
+        if (!service && viewStep === "Offerte") void (async () => {
+          const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
+          if (curIdx >= 0 && curIdx < PROJECT_STEPS.indexOf("Offerte")) await setStatus("Offerte");
+        })();
+      }} />
+      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "none"} draft={lab} onClose={() => {
+        setLab(null);
+        if (!service && viewStep === "Offerte") void (async () => {
+          const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
+          if (curIdx >= 0 && curIdx < PROJECT_STEPS.indexOf("Offerte")) await setStatus("Offerte");
+        })();
+      }} />
       <SourceFilesSheet jobId={id} open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
       <Sheet open={cancelOpen} onOpenChange={setCancelOpen}>
         <SheetContent side="bottom" className="rounded-t-2xl">
@@ -298,6 +336,9 @@ function ProjectStepContent({
   onEditLabour,
   onViewSources,
   onAddPhoto,
+  onPhotoFiles,
+  onConfirmOffer,
+  onTouchOfferte,
   onComplete,
   onDeleted,
 }: {
@@ -311,6 +352,9 @@ function ProjectStepContent({
   onEditLabour: (d: Partial<Labour> & { job_id: string }) => void;
   onViewSources: () => void;
   onAddPhoto: () => void;
+  onPhotoFiles: (files: FileList | File[] | null) => Promise<void> | void;
+  onConfirmOffer: () => Promise<void>;
+  onTouchOfferte: () => void;
   onComplete: () => void;
   onDeleted: () => void;
 }) {
@@ -350,46 +394,28 @@ function ProjectStepContent({
         </section>
       );
     case "Produktauswahl":
-      return (
-        <div className="space-y-3">
-          <h2 className="section-title">Materialanforderungen</h2>
-          <p className="text-sm text-muted-foreground">Was gebraucht wird – danach ein internes Produkt zuordnen oder manuell anlegen.</p>
-          <Button variant="outline" className="h-11 w-full" onClick={onViewSources}>Unterlagen</Button>
-          <MaterialList jobId={jobId} onEdit={onEditMaterial} />
-          <Button variant="outline" className="h-12 w-full" onClick={onAddMaterial}>+ Material hinzufügen</Button>
-        </div>
-      );
     case "Kalkulation":
-      return <Kalkulation jobId={jobId} />;
     case "Offerte":
-      return <OffertePlaceholder job={job} jobId={jobId} />;
+      return (
+        <OfferteWorkspace
+          job={job}
+          jobId={jobId}
+          onEditLabour={onEditLabour}
+          onEditMaterial={onEditMaterial}
+          onViewSources={onViewSources}
+          onConfirmed={() => void onConfirmOffer()}
+          onTouchOfferte={onTouchOfferte}
+        />
+      );
     case "Auftrag":
-      return <AuftragPlaceholder job={job} />;
     case "Ausführung":
       return (
-        <div className="space-y-4">
-          <p className="rounded-xl border bg-card p-4 text-sm font-semibold">Ausführung wird hier erfasst</p>
-          <section className="space-y-2 rounded-xl border bg-card p-4">
-            <h2 className="section-title">Arbeit</h2>
-            <LabourList jobId={jobId} onEdit={onEditLabour} />
-            <p className="text-xs text-muted-foreground">Ist-Zeiten für die Ausführung folgen. Aktuell: geplante Arbeitspositionen.</p>
-          </section>
-          <section className="space-y-2 rounded-xl border bg-card p-4">
-            <h2 className="section-title">Material</h2>
-            <MaterialList jobId={jobId} onEdit={onEditMaterial} />
-          </section>
-          <section className="space-y-2 rounded-xl border bg-card p-4">
-            <h2 className="section-title">Zusatzkosten</h2>
-            <p className="text-sm text-muted-foreground">Entsorgung, Parkgebühren und weitere Zusatzkosten. Keine separate Fahrzeit – Fahrzeugpauschale nur bei Regie.</p>
-          </section>
-          <section className="space-y-2 rounded-xl border bg-card p-4">
-            <h2 className="section-title">Fotos</h2>
-            <Button type="button" variant="outline" className="h-12 w-full" onClick={onAddPhoto}>
-              <Camera className="h-4 w-4" /> Foto
-            </Button>
-            <PhotoGallery jobId={jobId} />
-          </section>
-        </div>
+        <AusfuehrungWorkspace
+          jobId={jobId}
+          onAddPhoto={onAddPhoto}
+          onEditMaterial={onEditMaterial}
+          onPhotoFiles={onPhotoFiles}
+        />
       );
     case "Rechnung":
       return <AbrechnungPlaceholder jobId={jobId} />;
@@ -420,44 +446,13 @@ function ProjectStepContent({
   }
 }
 
-function OffertePlaceholder({ job, jobId }: { job: Job; jobId: string }) {
-  const materials = useMaterials(jobId);
-  const labour = useLabour(jobId);
-  const hours = (labour.data ?? []).reduce((s, l) => s + Number(l.hours), 0);
-  return (
-    <div className="space-y-4">
-      <section className="space-y-2 rounded-xl border bg-card p-4">
-        <h2 className="section-title">Offerte</h2>
-        <Row label="Projekt" value={job.title} />
-        <Row label="Materialpositionen" value={String(materials.data?.length ?? 0)} />
-        <Row label="Arbeitsstunden" value={`${hours.toLocaleString("de-CH")} h`} />
-        <p className="pt-2 text-sm text-muted-foreground">Zusammenfassung aus den erfassten Positionen. Versand und Bexio folgen.</p>
-      </section>
-      <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
-        <FileText className="h-4 w-4" /> Offerte in Bexio erstellen (folgt)
-      </button>
-    </div>
-  );
-}
-
-function AuftragPlaceholder({ job }: { job: Job }) {
-  return (
-    <section className="space-y-2 rounded-xl border bg-card p-4">
-      <h2 className="section-title">Auftrag</h2>
-      <Row label="Projekt" value={job.title} />
-      <Row label="Aktueller Status" value={job.status} />
-      {job.appointment_at && <Row label="Termin" value={formatDate(job.appointment_at, true)} />}
-      <p className="pt-2 text-sm text-muted-foreground">Auftragsbestätigung und Bexio-Anbindung folgen. Status nur über «Weiter zu …» oder Abschlussaktionen ändern.</p>
-    </section>
-  );
-}
-
 function AbrechnungPlaceholder({ jobId }: { jobId: string }) {
   return (
     <div className="space-y-4">
+      <QuoteTotalsCard jobId={jobId} />
       <section className="space-y-2 rounded-xl border bg-card p-4">
         <h2 className="section-title">Kundenrechnung</h2>
-        <p className="text-sm text-muted-foreground">Rechnung an den Kunden folgt (ohne Bexio).</p>
+        <p className="text-sm text-muted-foreground">SOLL aus der bestätigten Offerte, IST aus der Ausführung. Rechnung an den Kunden folgt (ohne Bexio).</p>
         <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
           <FileText className="h-4 w-4" /> Rechnung in Bexio erstellen (folgt)
         </button>

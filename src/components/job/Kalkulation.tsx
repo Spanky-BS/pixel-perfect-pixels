@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { FileText } from "lucide-react";
 import { settingsQuery } from "@/lib/queries";
-import { formatCHF } from "@/lib/app";
+import { formatCHF, isQuotedLabour } from "@/lib/app";
 import { unitSalesPrice, type Product } from "@/lib/products";
 import { useMaterials } from "./MaterialList";
 import { useLabour } from "./LabourList";
@@ -18,7 +18,7 @@ export function Kalkulation({ jobId }: { jobId: string }) {
   const labour = useLabour(jobId);
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
   const fallbackMarkup = Number(settings.data?.default_material_markup ?? 0);
-  const lab = labour.data ?? [];
+  const lab = (labour.data ?? []).filter(isQuotedLabour);
   const hours = lab.reduce((s, l) => s + Number(l.hours), 0);
   const labourTotal = lab.reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
 
