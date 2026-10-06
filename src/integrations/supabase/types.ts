@@ -451,6 +451,63 @@ export type Database = {
           },
         ]
       }
+      labour_time_entries: {
+        Row: {
+          created_at: string
+          end_at: string | null
+          hours: number
+          id: string
+          job_id: string
+          labour_item_id: string
+          notes: string | null
+          start_at: string | null
+          technician: string | null
+          user_id: string
+          worked_on: string | null
+        }
+        Insert: {
+          created_at?: string
+          end_at?: string | null
+          hours?: number
+          id?: string
+          job_id: string
+          labour_item_id: string
+          notes?: string | null
+          start_at?: string | null
+          technician?: string | null
+          user_id?: string
+          worked_on?: string | null
+        }
+        Update: {
+          created_at?: string
+          end_at?: string | null
+          hours?: number
+          id?: string
+          job_id?: string
+          labour_item_id?: string
+          notes?: string | null
+          start_at?: string | null
+          technician?: string | null
+          user_id?: string
+          worked_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "labour_time_entries_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_time_entries_labour_item_id_fkey"
+            columns: ["labour_item_id"]
+            isOneToOne: false
+            referencedRelation: "labour_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       material_categories: {
         Row: {
           created_at: string
@@ -477,6 +534,7 @@ export type Database = {
       }
       material_requirements: {
         Row: {
+          actual_quantity: number | null
           category_id: string | null
           confidence: string | null
           created_at: string
@@ -497,6 +555,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          actual_quantity?: number | null
           category_id?: string | null
           confidence?: string | null
           created_at?: string
@@ -517,6 +576,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          actual_quantity?: number | null
           category_id?: string | null
           confidence?: string | null
           created_at?: string
