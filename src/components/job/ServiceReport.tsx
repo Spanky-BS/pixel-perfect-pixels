@@ -447,13 +447,13 @@ export function ServiceReportAction({ job }: { job: JobForReport }) {
           </SheetHeader>
           <div className="flex gap-2 px-4 pb-2">
             <Button className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onPrint()}>
-              <Printer className="h-4 w-4" /> Drucken / PDF
+              <Printer className="h-4 w-4" /> Drucken
             </Button>
             <Button variant="outline" className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onDownload()}>
-              <Download className="h-4 w-4" /> Herunterladen
+              <Download className="h-4 w-4" /> PDF speichern
             </Button>
             <Button variant="outline" className="h-11 flex-1" disabled={busy || loading || !model} onClick={() => void onShare()}>
-              <Share2 className="h-4 w-4" /> Teilen
+              <Share2 className="h-4 w-4" /> PDF teilen
             </Button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 p-3">

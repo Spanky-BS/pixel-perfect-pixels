@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, Pencil, Trash2 } from "lucide-react";
+import { Download, FileText, Pencil, Share2, Trash2 } from "lucide-react";
+import { downloadFile, elementToPdf, shareOrDownload } from "@/lib/pdf";
+import { SERVICE_REPORT_CSS } from "@/lib/service-report";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { MaterialList } from "@/components/job/MaterialList";
@@ -356,8 +358,153 @@ function OffertePreview({ job, jobId }: { job: JobWithCustomer; jobId: string })
         <Row label={`MWST ${vatRate}%`} value={formatCHF(totals.vat)} />
         <Row label="Total CHF" value={formatCHF(totals.total)} bold />
       </div>
-      <p className="text-xs text-muted-foreground">Vorschau – Versand nach Bexio folgt.</p>
+      <OffertePdfActions job={job} quoted={quoted} materials={materials.data ?? []} markup={markup} vatRate={vatRate} totals={totals} company={company} />
     </div>
+  );
+}
+
+function OffertePdfActions({
+  job, quoted, materials, markup, vatRate, totals, company,
+}: {
+  job: JobWithCustomer;
+  quoted: Labour[];
+  materials: Material[];
+  markup: number;
+  vatRate: number;
+  totals: ReturnType<typeof computeQuote>;
+  company: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const c = job.customers;
+  const today = formatDate(new Date().toISOString());
+  const nr = `OF-${new Date(job.created_at).getFullYear()}-${job.id.slice(0, 6).toUpperCase()}`;
+  const filename = `Offerte_${nr}_${(job.title || "Projekt").replace(/[^\w\-äöüÄÖÜ]+/g, "_")}`;
+  const contact = c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "";
+  const custLines = c ? [c.company_name, contact, c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
+
+  async function run(share: boolean) {
+    if (!ref.current) return;
+    setBusy(true);
+    const t = toast.loading("PDF wird erstellt…");
+    try {
+      const file = await elementToPdf(ref.current, filename);
+      if (share) {
+        const r = await shareOrDownload(file, `Offerte ${nr}`);
+        if (r === "downloaded") toast.success("PDF heruntergeladen", { id: t });
+        else toast.dismiss(t);
+      } else {
+        downloadFile(file);
+        toast.success("PDF gespeichert", { id: t });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "PDF fehlgeschlagen", { id: t });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      {totals.incomplete && <p className="rounded-lg border border-warning bg-warning/15 p-3 text-sm">{totals.unpriced} Material-Position(en) ohne Preis – im PDF als «–» aufgeführt.</p>}
+      <div className="grid grid-cols-2 gap-2">
+        <Button className="h-12 font-semibold" disabled={busy} onClick={() => void run(false)}>
+          <Download className="h-4 w-4" /> Offerte als PDF
+        </Button>
+        <Button variant="outline" className="h-12 font-semibold" disabled={busy} onClick={() => void run(true)}>
+          <Share2 className="h-4 w-4" /> PDF teilen
+        </Button>
+      </div>
+      <div aria-hidden style={{ position: "fixed", left: "-10000px", top: 0, width: "190mm" }}>
+        <style>{SERVICE_REPORT_CSS}</style>
+        <div ref={ref} className="sr-page" style={{ background: "#fff", padding: "0" }}>
+          <header className="sr-header">
+            <img className="sr-logo" src={COMPANY.logoUrl} alt={company} />
+            <div className="sr-co">
+              <strong>{company}</strong>
+              {COMPANY.street}, {COMPANY.zipCity}<br />
+              {COMPANY.phone}<br />
+              {COMPANY.email}<br />
+              {COMPANY.website}
+            </div>
+          </header>
+          <h1 className="sr-title">Offerte</h1>
+          <p className="sr-sub">{job.title}</p>
+          <div className="sr-grid">
+            <div className="sr-box">
+              <h3>Kunde</h3>
+              <p style={{ margin: 0 }}>{custLines.map((l, i) => <span key={i}>{l}<br /></span>)}</p>
+            </div>
+            <div className="sr-box">
+              <h3>Offerte</h3>
+              <dl>
+                <dt>Offertnummer:</dt><dd>{nr}</dd>
+                <dt>Datum:</dt><dd>{today}</dd>
+                <dt>Objekt:</dt><dd>{address(job) || "–"}</dd>
+                <dt>Gültig:</dt><dd>30 Tage</dd>
+              </dl>
+            </div>
+          </div>
+          {quoted.length > 0 && (
+            <section className="sr-sec">
+              <h3>Arbeiten</h3>
+              <table className="sr-table">
+                <thead><tr><th>Beschreibung</th><th className="num">Stunden</th><th className="num">Ansatz</th><th className="num">Betrag</th></tr></thead>
+                <tbody>
+                  {quoted.map((l) => (
+                    <tr key={l.id}>
+                      <td>{l.description || "–"}{l.notes?.trim() ? <><br /><small>{l.notes}</small></> : null}</td>
+                      <td className="num">{Number(l.hours).toLocaleString("de-CH")}</td>
+                      <td className="num">{formatCHF(Number(l.hourly_rate))}</td>
+                      <td className="num">{formatCHF(labourQuoteAmount(l))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td colSpan={3}>Total Arbeit:</td><td className="num">{formatCHF(totals.labourTotal)}</td></tr></tfoot>
+              </table>
+            </section>
+          )}
+          {materials.length > 0 && (
+            <section className="sr-sec">
+              <h3>Material</h3>
+              <table className="sr-table">
+                <thead><tr><th>Artikel</th><th className="num">Menge</th><th className="num">Preis</th><th className="num">Betrag</th></tr></thead>
+                <tbody>
+                  {materials.map((m) => {
+                    const p = linkedProduct(m as { products?: Parameters<typeof linkedProduct>[0]["products"] });
+                    const qty = Number(m.quantity);
+                    const vk = p ? unitSalesPrice(p, markup) : null;
+                    return (
+                      <tr key={m.id}>
+                        <td>{p?.name || m.description || "–"}</td>
+                        <td className="num">{qty.toLocaleString("de-CH")} {m.unit}</td>
+                        <td className="num">{vk != null ? formatCHF(vk) : "–"}</td>
+                        <td className="num">{vk != null ? formatCHF(vk * qty) : "–"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot><tr><td colSpan={3}>Total Material:</td><td className="num">{formatCHF(totals.materialTotal)}</td></tr></tfoot>
+              </table>
+            </section>
+          )}
+          <div className="sr-tot">
+            <h3>Zusammenfassung</h3>
+            <table><tbody>
+              <tr><td>Zwischensumme netto:</td><td className="num">{formatCHF(totals.subtotal)}</td></tr>
+              <tr><td>MWST {vatRate}%:</td><td className="num">{formatCHF(totals.vat)}</td></tr>
+              <tr className="grand"><td>Totalbetrag:</td><td className="num">{formatCHF(totals.total)}</td></tr>
+            </tbody></table>
+          </div>
+          <p style={{ marginTop: 14 }}>Wir danken für Ihre Anfrage und freuen uns auf Ihren Auftrag. Preise in CHF, inkl. MWST, gültig 30 Tage.</p>
+          <div className="sr-sig">
+            <div><div className="sr-sig-empty" /><div className="sr-line">Ort / Datum / Unterschrift Kunde</div></div>
+            <div><div className="sr-sig-empty" /><div className="sr-line">{company}</div></div>
+          </div>
+          <footer className="sr-foot"><span>{company}</span><span>{nr}</span></footer>
+        </div>
+      </div>
+    </>
   );
 }
 
