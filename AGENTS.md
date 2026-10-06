@@ -17,3 +17,4 @@
 - Supplier/quotation/Bexio tables exist as structure only; no integration code until that phase.
 
 - Jobs have `job_type` (project|service); status steps per type live in `src/lib/app.ts` (`stepsFor`), legacy project statuses are mapped via `normalizeStatus` instead of rewriting rows.
+- Never ignore `.env` in `.gitignore`: it holds only public connection values, and published builds lose the backend connection (blank screen) without it.
