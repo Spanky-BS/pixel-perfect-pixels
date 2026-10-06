@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.service_report_counters (
 GRANT SELECT, INSERT, UPDATE ON public.service_report_counters TO authenticated;
 GRANT ALL ON public.service_report_counters TO service_role;
 ALTER TABLE public.service_report_counters ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own report counters" ON public.service_report_counters;
 CREATE POLICY "own report counters" ON public.service_report_counters
   FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 

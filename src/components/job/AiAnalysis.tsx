@@ -37,7 +37,9 @@ export function AiAnalysis({ jobId, onEditMaterial, onEditLabour }: {
     setBusy(true);
     try {
       const r = await run({ data: { jobId } });
-      if (r.skippedDocuments?.length) {
+      if (r.nothingNew) {
+        toast.message("Keine neuen Aufnahmen – bereits ausgewertete Notizen werden nicht nochmals ausgewertet.");
+      } else if (r.skippedDocuments?.length) {
         toast.success(r.count ? `${r.count} Anforderungen erkannt` : "Auswertung abgeschlossen");
         toast.message(`Nicht automatisch ausgewertet: ${r.skippedDocuments.join(", ")}`);
       } else {
@@ -104,7 +106,7 @@ export function AiAnalysis({ jobId, onEditMaterial, onEditLabour }: {
       {list.length > 0 && (
         <div className="space-y-4 rounded-xl border bg-card p-4">
           <h2 className="section-title">Erkannte Anforderungen</h2>
-          <p className="text-xs text-muted-foreground">Vorschläge prüfen. Fehlende Angaben werden nicht erfunden, sondern als offene Punkte aufgeführt.</p>
+          <p className="text-xs text-muted-foreground">Bei erneutem Auswerten werden nur neue Aufnahmen berücksichtigt. Vorschläge prüfen. Fehlende Angaben werden nicht erfunden, sondern als offene Punkte aufgeführt.</p>
           {groups.map(([k, label]) => {
             const rows = list.filter((r) => r.kind === k);
             if (!rows.length) return null;

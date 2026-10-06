@@ -78,6 +78,13 @@
       "when": 1791280000000,
       "tag": "0010_project_execution",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791315038669,
+      "tag": "0011_capture_analyzed_at",
+      "breakpoints": true
     }
   ]
 }

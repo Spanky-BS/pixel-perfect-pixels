@@ -223,6 +223,7 @@ export type Database = {
       }
       job_documents: {
         Row: {
+          analyzed_at: string | null
           created_at: string
           description: string | null
           file_name: string
@@ -234,6 +235,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analyzed_at?: string | null
           created_at?: string
           description?: string | null
           file_name?: string
@@ -245,6 +247,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          analyzed_at?: string | null
           created_at?: string
           description?: string | null
           file_name?: string
@@ -267,6 +270,7 @@ export type Database = {
       }
       job_photos: {
         Row: {
+          analyzed_at: string | null
           category: string | null
           created_at: string
           description: string | null
@@ -277,6 +281,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analyzed_at?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
@@ -287,6 +292,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          analyzed_at?: string | null
           category?: string | null
           created_at?: string
           description?: string | null
@@ -1413,6 +1419,7 @@ export type Database = {
       }
       voice_notes: {
         Row: {
+          analyzed_at: string | null
           created_at: string
           duration_seconds: number | null
           id: string
@@ -1424,6 +1431,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analyzed_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           id?: string
@@ -1435,6 +1443,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          analyzed_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           id?: string

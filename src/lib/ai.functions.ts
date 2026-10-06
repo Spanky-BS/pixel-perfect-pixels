@@ -56,20 +56,32 @@ export const analyzeJob = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const sb = context.supabase;
 
-    const [{ data: job }, { data: notes }, { data: photos }, { data: cats }, { data: docs }] = await Promise.all([
+    const [{ data: job }, { data: allNotes }, { data: allPhotos }, { data: cats }, { data: allDocs }, { data: mats }, { data: labs }, { data: opens }] = await Promise.all([
       sb.from("jobs").select("title, notes, problem_description, customer_request").eq("id", data.jobId).maybeSingle(),
-      sb.from("voice_notes").select("kind, transcript, created_at").eq("job_id", data.jobId).order("created_at"),
-      sb.from("job_photos").select("storage_path, description, category").eq("job_id", data.jobId).order("taken_at").limit(8),
+      sb.from("voice_notes").select("id, kind, transcript, created_at, analyzed_at").eq("job_id", data.jobId).order("created_at"),
+      sb.from("job_photos").select("id, storage_path, description, category, analyzed_at").eq("job_id", data.jobId).order("taken_at"),
       sb.from("material_categories").select("name").order("sort_order"),
-      sb.from("job_documents").select("storage_path, file_name, file_type, mime_type").eq("job_id", data.jobId).order("created_at"),
+      sb.from("job_documents").select("id, storage_path, file_name, file_type, mime_type, analyzed_at").eq("job_id", data.jobId).order("created_at"),
+      sb.from("material_requirements").select("description, quantity, unit").eq("job_id", data.jobId),
+      sb.from("labour_items").select("description, hours").eq("job_id", data.jobId),
+      sb.from("open_questions").select("text").eq("job_id", data.jobId),
     ]);
     if (!job) throw new Error("Auftrag nicht gefunden");
+
+    // Only analyse captures that were not part of a previous analysis.
+    const notes = (allNotes ?? []).filter((n) => !n.analyzed_at && n.transcript);
+    const photos = (allPhotos ?? []).filter((p) => !p.analyzed_at).slice(0, 8);
+    const docs = (allDocs ?? []).filter((d) => !d.analyzed_at);
+    const followUp = [...(allNotes ?? []), ...(allPhotos ?? []), ...(allDocs ?? [])].some((x) => x.analyzed_at);
+    if (!notes.length && !photos.length && !docs.length) {
+      if (followUp) return { count: 0, skippedDocuments: [] as string[], nothingNew: true };
+    }
 
     const skippedDocuments: string[] = [];
     const docTexts: string[] = [];
     const docImagePaths: string[] = [];
 
-    for (const doc of docs ?? []) {
+    for (const doc of docs) {
       const kind = classifyDoc(doc.file_name, doc.mime_type, doc.file_type);
       if (kind === "image") {
         docImagePaths.push(doc.storage_path);
@@ -89,14 +101,22 @@ export const analyzeJob = createServerFn({ method: "POST" })
       else skippedDocuments.push(`${doc.file_name} (${extracted.reason})`);
     }
 
+    const known = [
+      ...(mats ?? []).map((m) => `Material: ${m.description} (${m.quantity} ${m.unit})`),
+      ...(labs ?? []).map((l) => `Arbeit: ${l.description} (${l.hours} h)`),
+      ...(opens ?? []).map((o) => `Offener Punkt: ${o.text}`),
+    ];
     const text = [
       `Projekt: ${job.title}`,
-      job.notes && `Notizen: ${job.notes}`,
-      job.problem_description && `Problem: ${job.problem_description}`,
-      job.customer_request && `Kundenwunsch: ${job.customer_request}`,
+      !followUp && job.notes && `Notizen: ${job.notes}`,
+      !followUp && job.problem_description && `Problem: ${job.problem_description}`,
+      !followUp && job.customer_request && `Kundenwunsch: ${job.customer_request}`,
       `Verfügbare Materialkategorien: ${(cats ?? []).map((c) => c.name).join(", ")}`,
-      ...(notes ?? []).filter((n) => n.transcript).map((n) => `${n.kind === "voice" ? "Sprachnotiz" : "Textnotiz"}: ${n.transcript}`),
-      ...(photos ?? []).filter((p) => p.description || p.category).map((p, i) => `Foto ${i + 1}: ${[p.category, p.description].filter(Boolean).join(" – ")}`),
+      followUp && known.length
+        ? `NACHTRAG: Die folgenden Positionen sind bereits erfasst. Wiederhole sie NICHT, erfasse nur Neues aus den neuen Aufnahmen:\n${known.join("\n")}`
+        : null,
+      ...notes.map((n) => `${followUp ? "Neue " : ""}${n.kind === "voice" ? "Sprachnotiz" : "Textnotiz"}: ${n.transcript}`),
+      ...photos.filter((p) => p.description || p.category).map((p, i) => `Foto ${i + 1}: ${[p.category, p.description].filter(Boolean).join(" – ")}`),
       ...docTexts,
       skippedDocuments.length
         ? `Diese Unterlagen liegen vor, wurden aber NICHT automatisch ausgewertet: ${skippedDocuments.join("; ")}`
@@ -104,7 +124,7 @@ export const analyzeJob = createServerFn({ method: "POST" })
     ].filter(Boolean).join("\n");
 
     const content: Array<Record<string, unknown>> = [{ type: "text", text }];
-    const imagePaths = [...(photos ?? []).map((p) => p.storage_path), ...docImagePaths].slice(0, 8);
+    const imagePaths = [...photos.map((p) => p.storage_path), ...docImagePaths].slice(0, 8);
     if (imagePaths.length) {
       const { data: urls } = await sb.storage.from("job-media").createSignedUrls(imagePaths, 600);
       urls?.forEach((u) => u.signedUrl && content.push({ type: "image_url", image_url: { url: u.signedUrl } }));
@@ -125,7 +145,8 @@ export const analyzeJob = createServerFn({ method: "POST" })
       if (!open.includes(msg)) open.push(msg);
     });
 
-    await sb.from("ai_suggestions").delete().eq("job_id", data.jobId).eq("state", "pending");
+    // First analysis replaces stale pending suggestions; a follow-up only adds new ones.
+    if (!followUp) await sb.from("ai_suggestions").delete().eq("job_id", data.jobId).eq("state", "pending");
     const rows = [
       ...(out.material ?? []).map((m) => ({ job_id: data.jobId, kind: "material", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
       ...(out.arbeit ?? []).map((m) => ({ job_id: data.jobId, kind: "labour", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
@@ -135,7 +156,13 @@ export const analyzeJob = createServerFn({ method: "POST" })
       const { error } = await sb.from("ai_suggestions").insert(rows);
       if (error) throw new Error(error.message);
     }
-    return { count: rows.length, skippedDocuments };
+    const now = new Date().toISOString();
+    await Promise.all([
+      notes.length ? sb.from("voice_notes").update({ analyzed_at: now }).in("id", notes.map((n) => n.id)) : null,
+      photos.length ? sb.from("job_photos").update({ analyzed_at: now }).in("id", photos.map((p) => p.id)) : null,
+      docs.length ? sb.from("job_documents").update({ analyzed_at: now }).in("id", docs.map((d) => d.id)) : null,
+    ]);
+    return { count: rows.length, skippedDocuments, nothingNew: false };
   });
 
 const SERVICE_CAPTURE_SYSTEM = `Du erfasst ausgeführte Sanitär-Regiearbeiten in der Schweiz (Haustechnik Nordwestschweiz).

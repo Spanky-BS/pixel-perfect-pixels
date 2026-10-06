@@ -19,8 +19,10 @@ CREATE TABLE IF NOT EXISTS public.labour_time_entries (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.labour_time_entries TO authenticated;
 GRANT ALL ON public.labour_time_entries TO service_role;
 ALTER TABLE public.labour_time_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "own time entries" ON public.labour_time_entries;
 CREATE POLICY "own time entries" ON public.labour_time_entries
   FOR ALL TO authenticated USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+DROP TRIGGER IF EXISTS tj_labour_time_entries ON public.labour_time_entries;
 CREATE TRIGGER tj_labour_time_entries
   AFTER INSERT OR UPDATE OR DELETE ON public.labour_time_entries
   FOR EACH ROW EXECUTE FUNCTION public.touch_job();
