@@ -42,7 +42,7 @@ export function matchGuide(text: string): PriceGuideEntry | null {
 
 const mid = (r: { low: number; high: number }) => (r.low + r.high) / 2;
 
-export type GuideMaterial = { description: string; quantity: number; category?: string | null };
+export type GuideMaterial = { description: string; quantity: number; category?: string | null | undefined };
 export type GuideLabour = { description: string; hours: number; hourly_rate: number };
 
 /** Returns amount per estimate section, pre-filled from reference prices. */
@@ -65,6 +65,6 @@ export function estimateFromGuide(materials: GuideMaterial[], labour: GuideLabou
     add(FLAT.demontage.section, mid(FLAT.demontage));
     add(FLAT.entsorgung.section, mid(FLAT.entsorgung));
   }
-  for (const k of Object.keys(out)) out[k] = Math.round(out[k]);
+  for (const k of Object.keys(out)) out[k] = Math.round(out[k] ?? 0);
   return out;
 }
