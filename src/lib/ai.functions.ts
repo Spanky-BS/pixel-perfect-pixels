@@ -145,7 +145,8 @@ export const analyzeJob = createServerFn({ method: "POST" })
       if (!open.includes(msg)) open.push(msg);
     });
 
-    await sb.from("ai_suggestions").delete().eq("job_id", data.jobId).eq("state", "pending");
+    // First analysis replaces stale pending suggestions; a follow-up only adds new ones.
+    if (!followUp) await sb.from("ai_suggestions").delete().eq("job_id", data.jobId).eq("state", "pending");
     const rows = [
       ...(out.material ?? []).map((m) => ({ job_id: data.jobId, kind: "material", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
       ...(out.arbeit ?? []).map((m) => ({ job_id: data.jobId, kind: "labour", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
@@ -155,7 +156,13 @@ export const analyzeJob = createServerFn({ method: "POST" })
       const { error } = await sb.from("ai_suggestions").insert(rows);
       if (error) throw new Error(error.message);
     }
-    return { count: rows.length, skippedDocuments };
+    const now = new Date().toISOString();
+    await Promise.all([
+      notes.length ? sb.from("voice_notes").update({ analyzed_at: now }).in("id", notes.map((n) => n.id)) : null,
+      photos.length ? sb.from("job_photos").update({ analyzed_at: now }).in("id", photos.map((p) => p.id)) : null,
+      docs.length ? sb.from("job_documents").update({ analyzed_at: now }).in("id", docs.map((d) => d.id)) : null,
+    ]);
+    return { count: rows.length, skippedDocuments, nothingNew: false };
   });
 
 const SERVICE_CAPTURE_SYSTEM = `Du erfasst ausgeführte Sanitär-Regiearbeiten in der Schweiz (Haustechnik Nordwestschweiz).
