@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { next?: string | undefined } => ({
     next: ((n) => (typeof n === "string" && n.startsWith("/") && !n.startsWith("//") ? n : undefined))(s["next"]) as string | undefined,
   }),
   head: () => ({
