@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" && s.next.startsWith("/") && !s.next.startsWith("//") ? s.next : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Anmelden – Haustechnik Nordwestschweiz" },
@@ -17,15 +20,21 @@ export const Route = createFileRoute("/auth")({
       { property: "og:description", content: "Anmeldung zur Baustellen-App von Haustechnik Nordwestschweiz." },
     ],
   }),
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
     const { data } = await supabase.auth.getSession();
-    if (data.session) throw redirect({ to: "/uebersicht" });
+    if (data.session) {
+      if (search.next) throw redirect({ href: search.next });
+      throw redirect({ to: "/uebersicht" });
+    }
   },
   component: AuthPage,
 });
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { next } = Route.useSearch();
+  const back = next ? window.location.origin + next : window.location.origin;
+  const done = () => (next ? window.location.assign(next) : navigate({ to: "/uebersicht" }));
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -38,12 +47,12 @@ function AuthPage() {
       if (mode === "login") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: "/uebersicht" });
+        done();
       } else {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin },
+          options: { emailRedirectTo: back },
         });
         if (error) throw error;
         toast.success("Bitte E-Mail bestätigen – Link wurde gesendet.");
@@ -57,9 +66,9 @@ function AuthPage() {
   }
 
   async function google() {
-    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
+    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: back });
     if (r.error) toast.error("Google-Anmeldung fehlgeschlagen");
-    else if (!r.redirected) navigate({ to: "/uebersicht" });
+    else if (!r.redirected) done();
   }
 
   return (

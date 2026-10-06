@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as AuthenticatedArchivRouteImport } from './routes/_authenticated/archiv'
 import { Route as AuthenticatedEinstellungenRouteImport } from './routes/_authenticated/einstellungen'
 import { Route as AuthenticatedUebersichtRouteImport } from './routes/_authenticated/uebersicht'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as AuthenticatedBaustellenIndexRouteImport } from './routes/_authenticated/baustellen/index'
 import { Route as AuthenticatedBaustellenIdRouteImport } from './routes/_authenticated/baustellen/$id'
 import { Route as AuthenticatedBaustellenNeuRouteImport } from './routes/_authenticated/baustellen/neu'
@@ -35,6 +38,17 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedArchivRoute = AuthenticatedArchivRouteImport.update({
   id: '/archiv',
   path: '/archiv',
@@ -50,6 +64,11 @@ const AuthenticatedUebersichtRoute = AuthenticatedUebersichtRouteImport.update({
   id: '/uebersicht',
   path: '/uebersicht',
   getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedBaustellenIndexRoute =
   AuthenticatedBaustellenIndexRouteImport.update({
@@ -84,9 +103,12 @@ const AuthenticatedKundenIdRoute = AuthenticatedKundenIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/archiv': typeof AuthenticatedArchivRoute
   '/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
   '/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
   '/kunden/$id': typeof AuthenticatedKundenIdRoute
@@ -96,9 +118,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/archiv': typeof AuthenticatedArchivRoute
   '/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
   '/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
   '/kunden/$id': typeof AuthenticatedKundenIdRoute
@@ -110,9 +135,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/mcp': typeof McpRoute
+  '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/archiv': typeof AuthenticatedArchivRoute
   '/_authenticated/einstellungen': typeof AuthenticatedEinstellungenRoute
   '/_authenticated/uebersicht': typeof AuthenticatedUebersichtRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_authenticated/baustellen/$id': typeof AuthenticatedBaustellenIdRoute
   '/_authenticated/baustellen/neu': typeof AuthenticatedBaustellenNeuRoute
   '/_authenticated/kunden/$id': typeof AuthenticatedKundenIdRoute
@@ -124,9 +152,12 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/archiv'
     | '/einstellungen'
     | '/uebersicht'
+    | '/.lovable/oauth/consent'
     | '/baustellen/$id'
     | '/baustellen/neu'
     | '/kunden/$id'
@@ -136,9 +167,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/archiv'
     | '/einstellungen'
     | '/uebersicht'
+    | '/.lovable/oauth/consent'
     | '/baustellen/$id'
     | '/baustellen/neu'
     | '/kunden/$id'
@@ -149,9 +183,12 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/mcp'
+    | '/.well-known/oauth-protected-resource'
     | '/_authenticated/archiv'
     | '/_authenticated/einstellungen'
     | '/_authenticated/uebersicht'
+    | '/.lovable/oauth/consent'
     | '/_authenticated/baustellen/$id'
     | '/_authenticated/baustellen/neu'
     | '/_authenticated/kunden/$id'
@@ -163,6 +200,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  McpRoute: typeof McpRoute
+  Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -188,6 +228,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/archiv': {
       id: '/_authenticated/archiv'
       path: '/archiv'
@@ -208,6 +262,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/uebersicht'
       preLoaderRoute: typeof AuthenticatedUebersichtRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/baustellen/': {
       id: '/_authenticated/baustellen/'
@@ -276,6 +337,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  McpRoute: McpRoute,
+  Char91DotwellKnownChar93OauthProtectedResourceRoute:
+    Char91DotwellKnownChar93OauthProtectedResourceRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
