@@ -31,7 +31,7 @@ import { unitSalesPrice } from "@/lib/products";
 
 const seedingJobs = new Set<string>();
 
-type JobWithCustomer = Job & { customers?: Customer | null };
+type JobWithCustomer = Job & { customers?: Customer | null | undefined };
 
 export function OfferteWorkspace({
   job,
