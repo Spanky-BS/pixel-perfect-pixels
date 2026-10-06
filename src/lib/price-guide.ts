@@ -9,7 +9,7 @@ export const PRICE_GUIDE: PriceGuideEntry[] = [
   { label: "Wand-WC komplett", keywords: ["wc", "klosett", "toilette"], section: "Sanitärapparate", low: 650, high: 950 },
   { label: "Vorwandelement (z.B. Geberit Duofix)", keywords: ["duofix", "vorwand", "unterputz", "spülkasten", "spuelkasten"], section: "Installationsmaterial", low: 450, high: 650 },
   { label: "Betätigungsplatte", keywords: ["betätigung", "betaetigung", "drückerplatte", "sigma"], section: "Sanitärapparate", low: 120, high: 280 },
-  { label: "Waschtisch mit Unterbaumöbel", keywords: ["unterbau", "möbel", "moebel", "waschtischmöbel"], section: "Sanitärapparate", low: 1200, high: 1900 },
+  { label: "Waschtisch mit Unterbaumöbel", keywords: ["unterbaumöbel", "unterbaumoebel", "unterbau", "möbel", "moebel", "waschtischmöbel"], section: "Sanitärapparate", low: 1200, high: 1900 },
   { label: "Waschtisch / Lavabo", keywords: ["waschtisch", "lavabo", "aufsatzbecken", "becken"], section: "Sanitärapparate", low: 350, high: 750 },
   { label: "Spiegelschrank", keywords: ["spiegelschrank", "spiegel"], section: "Sanitärapparate", low: 750, high: 1200 },
   { label: "Dusche bodeneben / Duschwanne", keywords: ["dusche", "duschwanne", "bodeneben", "duschrinne"], section: "Sanitärapparate", low: 1500, high: 2400 },
