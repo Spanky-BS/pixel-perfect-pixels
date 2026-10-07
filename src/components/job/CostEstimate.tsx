@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
-import { CONFIDENCE, ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, formatDate, roundTo } from "@/lib/app";
-import { hourlyRateFromSettings, MISSING_RATE, settingNumber } from "@/lib/commercial";
+import { CONFIDENCE, ESTIMATE_DISCLAIMER, formatCHF, formatDate, roundTo } from "@/lib/app";
 import { companyExperienceQuery } from "@/lib/company-experience-data";
-import { bucketForMaterials, estimateWithExperience } from "@/lib/company-experience";
-import { estimateFromGuide } from "@/lib/price-guide";
+import { buildEstimate, saveEstimate } from "@/lib/estimate-build";
+import type { GuideLine } from "@/lib/price-guide";
 
 export function CostEstimate({ jobId }: { jobId: string }) {
   const qc = useQueryClient();
@@ -28,52 +27,21 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const cur = list.find((e) => e.id === sel) ?? list[0];
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
-  async function guideAmounts() {
-    const rate = hourlyRateFromSettings(settings.data);
-    const tolerance = settingNumber(settings.data?.estimate_tolerance);
-    if (rate == null || tolerance == null) {
-      toast.error(rate == null ? MISSING_RATE : "Grobkosten-Toleranz fehlt in den Einstellungen.");
-      return null;
-    }
-    const [{ data: lab }, { data: mat }] = await Promise.all([
-      supabase.from("labour_items").select("description, hours, hourly_rate, source, item_type, parent_id").eq("job_id", jobId),
-      supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
-    ]);
-    const materials = (mat ?? []).map((m) => ({
-      description: m.description,
-      quantity: Number(m.quantity),
-      category: (m.material_categories as { name: string } | null)?.name ?? null,
-    }));
-    const labour = (lab ?? []).filter((l) => l.source !== "execution" && (l.item_type === "task" ? !l.parent_id : true)).map((l) => ({
-      description: l.description,
-      hours: Number(l.hours),
-      hourly_rate: rate,
-    }));
-    const guide = estimateFromGuide(materials, labour);
-    const priced = estimateWithExperience({
-      guide,
-      labour,
-      currentRate: rate,
-      bucket: bucketForMaterials("project", materials),
-      observations: experience.data?.observations ?? [],
-    });
-    const notes = priced.explanations.length
-      ? priced.explanations.join(" ")
-      : "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)";
-    return { amounts: priced.amounts, notes, tolerance };
+  async function compute() {
+    const built = await buildEstimate(jobId, settings.data, experience.data?.observations ?? []);
+    if ("error" in built) { toast.error(built.error); return null; }
+    return built;
   }
 
   async function create() {
-    const built = await guideAmounts();
+    const built = await compute();
     if (!built) return;
     const { data, error } = await supabase.from("cost_estimates")
       .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: built.tolerance, notes: built.notes })
       .select("id").single();
     if (error) return toast.error(error.message);
-    await supabase.from("cost_estimate_items").insert(ESTIMATE_SECTIONS.map((section, i) => ({
-      estimate_id: data.id, section, description: section, amount: built.amounts[section] ?? 0, sort_order: i,
-    })));
-    toast.success(built.notes.startsWith("Vorbefüllt") ? "Mit Richtwerten aus Material & Arbeit vorbefüllt" : "Mit Firmenerfahrung und aktuellen Einstellungen vorbefüllt");
+    await saveEstimate(jobId, built, data.id);
+    toast.success("Grobkosten aus der Begehung berechnet");
     setSel(data.id);
     refresh();
   }
@@ -81,20 +49,12 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const [updating, setUpdating] = useState(false);
   async function update() {
     if (!cur) return;
-    if (!confirm("Beträge aus aktuellem Material & Arbeit neu berechnen? Manuell geänderte Beträge der Standard-Positionen werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
+    if (!confirm("Grobkosten aus der aktuellen Begehung neu berechnen? Manuell geänderte Beträge der Standard-Pakete werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
     setUpdating(true);
     try {
-      const built = await guideAmounts();
+      const built = await compute();
       if (!built) return;
-      const existing = cur.cost_estimate_items;
-      await Promise.all(ESTIMATE_SECTIONS.map((section, i) => {
-        const row = existing.find((it) => it.section === section && it.description === section)
-          ?? existing.find((it) => it.section === section);
-        const amount = built.amounts[section] ?? 0;
-        if (row) return supabase.from("cost_estimate_items").update({ amount }).eq("id", row.id);
-        return supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section, description: section, amount, sort_order: i });
-      }));
-      await supabase.from("cost_estimates").update({ notes: built.notes }).eq("id", cur.id);
+      await saveEstimate(jobId, built, cur.id);
       toast.success("Grobkosten aktualisiert");
       refresh();
     } finally {
@@ -127,7 +87,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   if (!cur) {
     return (
       <div className="space-y-3 rounded-xl border border-dashed bg-card p-5 text-center">
-        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte. Wird aus Material & Arbeit mit Schweizer Richtpreisen vorbefüllt.</p>
+        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte. Wird nach «Aufnahme auswerten» automatisch aus der Begehung berechnet.</p>
         <button onClick={create} className="h-12 w-full rounded-lg bg-primary font-semibold text-primary-foreground">Grobkostenschätzung erstellen</button>
       </div>
     );
@@ -159,7 +119,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
       </div>
 
       <button onClick={update} disabled={updating} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground disabled:opacity-60">
-        <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} /> Mit aktuellem Material & Arbeit aktualisieren
+        <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} /> Aus aktueller Begehung neu berechnen
       </button>
 
       <div className="grid grid-cols-2 gap-2">
@@ -179,7 +139,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
       </div>
 
       <div className="divide-y rounded-xl border bg-card">
-        {items.map((it) => <EstimateRow key={it.id} item={it} onChange={refresh} />)}
+        {items.filter((it) => Number(it.amount) !== 0 || it.section === "Sonstiges" && it.description !== "Sonstiges").map((it) => <EstimateRow key={it.id} item={it} onChange={refresh} />)}
         <button onClick={async () => { await supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section: "Sonstiges", description: "Neue Position", sort_order: items.length }); refresh(); }}
           className="flex h-12 w-full items-center justify-center gap-1 text-sm font-semibold text-primary"><Plus className="h-4 w-4" /> Position hinzufügen</button>
       </div>
@@ -194,20 +154,34 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   );
 }
 
-function EstimateRow({ item, onChange }: { item: { id: string; description: string; amount: number }; onChange: () => void }) {
+function EstimateRow({ item, onChange }: { item: { id: string; description: string; amount: number; details?: unknown }; onChange: () => void }) {
   const [d, setD] = useState(item.description);
   const [a, setA] = useState(String(item.amount));
+  const [open, setOpen] = useState(false);
   useEffect(() => { setD(item.description); setA(String(item.amount)); }, [item.description, item.amount]);
+  const lines = Array.isArray(item.details) ? (item.details as GuideLine[]) : [];
   async function save() {
     if (d === item.description && Number(a) === Number(item.amount)) return;
     await supabase.from("cost_estimate_items").update({ description: d, amount: Number(a) || 0 }).eq("id", item.id);
     onChange();
   }
   return (
-    <div className="flex items-center gap-2 p-2">
-      <Input className="h-11 flex-1 text-base" value={d} onChange={(e) => setD(e.target.value)} onBlur={save} />
-      <Input className="h-11 w-28 text-right font-mono text-base" type="number" inputMode="decimal" value={a} onChange={(e) => setA(e.target.value)} onBlur={save} />
-      <button aria-label="Entfernen" onClick={async () => { await supabase.from("cost_estimate_items").delete().eq("id", item.id); onChange(); }} className="flex h-11 w-10 items-center justify-center text-destructive"><Trash2 className="h-4 w-4" /></button>
+    <div className="p-2">
+      <div className="flex items-center gap-2">
+        <button aria-label="Inhalt anzeigen" disabled={!lines.length} onClick={() => setOpen(!open)} className="flex h-11 w-8 items-center justify-center text-muted-foreground disabled:opacity-30">
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        <Input className="h-11 flex-1 text-base" value={d} onChange={(e) => setD(e.target.value)} onBlur={save} />
+        <Input className="h-11 w-28 text-right font-mono text-base" type="number" inputMode="decimal" value={a} onChange={(e) => setA(e.target.value)} onBlur={save} />
+        <button aria-label="Entfernen" onClick={async () => { await supabase.from("cost_estimate_items").delete().eq("id", item.id); onChange(); }} className="flex h-11 w-10 items-center justify-center text-destructive"><Trash2 className="h-4 w-4" /></button>
+      </div>
+      {open && lines.length > 0 && (
+        <ul className="ml-10 mt-1 space-y-1 rounded-lg bg-muted p-2 text-sm">
+          {lines.map((l, i) => (
+            <li key={i} className="flex justify-between gap-2"><span className="text-muted-foreground">{l.label}</span><span className="shrink-0 font-mono">{formatCHF(l.amount)}</span></li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
