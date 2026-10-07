@@ -71,6 +71,15 @@ export function partsIn(text: string): number {
 const q4 = (h: number) => Math.round(h * 4) / 4;
 
 /** Every material/labour line with the section and amount it contributes to the estimate. */
+/** "Demontage und Remontage von 1 Pissoir" -> "1 Pissoir" */
+export function splitObject(description: string): string {
+  const von = description.match(/\bvon\s+(.+)$/i);
+  if (von) return von[1].trim();
+  return description
+    .replace(/\b(demontage|rückbau|rueckbau|remontage|wiedermontage|montage|wiederanschluss|anschluss|befüllung|und|sowie)\b/gi, "")
+    .replace(/[,]+/g, " ").replace(/\s+/g, " ").trim() || description;
+}
+
 export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]): GuideLine[] {
   const lines: GuideLine[] = [];
   let demolitionMentioned = false;
