@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
@@ -87,7 +87,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   if (!cur) {
     return (
       <div className="space-y-3 rounded-xl border border-dashed bg-card p-5 text-center">
-        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte. Wird aus Material & Arbeit mit Schweizer Richtpreisen vorbefüllt.</p>
+        <p className="text-sm text-muted-foreground">Optional: schnelle, unverbindliche Kostenschätzung für den Kunden – vor der Offerte. Wird nach «Aufnahme auswerten» automatisch aus der Begehung berechnet.</p>
         <button onClick={create} className="h-12 w-full rounded-lg bg-primary font-semibold text-primary-foreground">Grobkostenschätzung erstellen</button>
       </div>
     );
@@ -119,7 +119,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
       </div>
 
       <button onClick={update} disabled={updating} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground disabled:opacity-60">
-        <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} /> Mit aktuellem Material & Arbeit aktualisieren
+        <RefreshCw className={`h-4 w-4 ${updating ? "animate-spin" : ""}`} /> Aus aktueller Begehung neu berechnen
       </button>
 
       <div className="grid grid-cols-2 gap-2">
@@ -139,7 +139,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
       </div>
 
       <div className="divide-y rounded-xl border bg-card">
-        {items.map((it) => <EstimateRow key={it.id} item={it} onChange={refresh} />)}
+        {items.filter((it) => Number(it.amount) !== 0 || it.section === "Sonstiges" && it.description !== "Sonstiges").map((it) => <EstimateRow key={it.id} item={it} onChange={refresh} />)}
         <button onClick={async () => { await supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section: "Sonstiges", description: "Neue Position", sort_order: items.length }); refresh(); }}
           className="flex h-12 w-full items-center justify-center gap-1 text-sm font-semibold text-primary"><Plus className="h-4 w-4" /> Position hinzufügen</button>
       </div>
@@ -154,20 +154,34 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   );
 }
 
-function EstimateRow({ item, onChange }: { item: { id: string; description: string; amount: number }; onChange: () => void }) {
+function EstimateRow({ item, onChange }: { item: { id: string; description: string; amount: number; details?: unknown }; onChange: () => void }) {
   const [d, setD] = useState(item.description);
   const [a, setA] = useState(String(item.amount));
+  const [open, setOpen] = useState(false);
   useEffect(() => { setD(item.description); setA(String(item.amount)); }, [item.description, item.amount]);
+  const lines = Array.isArray(item.details) ? (item.details as GuideLine[]) : [];
   async function save() {
     if (d === item.description && Number(a) === Number(item.amount)) return;
     await supabase.from("cost_estimate_items").update({ description: d, amount: Number(a) || 0 }).eq("id", item.id);
     onChange();
   }
   return (
-    <div className="flex items-center gap-2 p-2">
-      <Input className="h-11 flex-1 text-base" value={d} onChange={(e) => setD(e.target.value)} onBlur={save} />
-      <Input className="h-11 w-28 text-right font-mono text-base" type="number" inputMode="decimal" value={a} onChange={(e) => setA(e.target.value)} onBlur={save} />
-      <button aria-label="Entfernen" onClick={async () => { await supabase.from("cost_estimate_items").delete().eq("id", item.id); onChange(); }} className="flex h-11 w-10 items-center justify-center text-destructive"><Trash2 className="h-4 w-4" /></button>
+    <div className="p-2">
+      <div className="flex items-center gap-2">
+        <button aria-label="Inhalt anzeigen" disabled={!lines.length} onClick={() => setOpen(!open)} className="flex h-11 w-8 items-center justify-center text-muted-foreground disabled:opacity-30">
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        <Input className="h-11 flex-1 text-base" value={d} onChange={(e) => setD(e.target.value)} onBlur={save} />
+        <Input className="h-11 w-28 text-right font-mono text-base" type="number" inputMode="decimal" value={a} onChange={(e) => setA(e.target.value)} onBlur={save} />
+        <button aria-label="Entfernen" onClick={async () => { await supabase.from("cost_estimate_items").delete().eq("id", item.id); onChange(); }} className="flex h-11 w-10 items-center justify-center text-destructive"><Trash2 className="h-4 w-4" /></button>
+      </div>
+      {open && lines.length > 0 && (
+        <ul className="ml-10 mt-1 space-y-1 rounded-lg bg-muted p-2 text-sm">
+          {lines.map((l, i) => (
+            <li key={i} className="flex justify-between gap-2"><span className="text-muted-foreground">{l.label}</span><span className="shrink-0 font-mono">{formatCHF(l.amount)}</span></li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

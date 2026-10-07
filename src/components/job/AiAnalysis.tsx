@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/Brand";
 import { analyzeJob } from "@/lib/ai.functions";
+import { buildEstimate, saveEstimate } from "@/lib/estimate-build";
 import { categoriesQuery, settingsQuery } from "@/lib/queries";
 import { LABOUR_ITEM_TASK, OPEN_STATUSES, type Labour, type Material } from "@/lib/app";
 import { hourlyRateFromSettings, MISSING_RATE } from "@/lib/commercial";
@@ -85,6 +86,15 @@ export function AiAnalysis({ jobId }: {
         toast.success(r.count ? `${r.count} Anforderungen erkannt` : "Nichts erkannt – mehr Notizen erfassen");
       }
       qc.invalidateQueries({ queryKey: ["ai", jobId] });
+      if (!r.nothingNew) {
+        const built = await buildEstimate(jobId, settings.data, experience.data?.observations ?? []);
+        if ("error" in built) toast.error(built.error);
+        else {
+          await saveEstimate(jobId, built);
+          qc.invalidateQueries({ queryKey: ["estimates", jobId] });
+          toast.success("Grobkosten automatisch berechnet");
+        }
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Auswertung fehlgeschlagen");
     } finally {
