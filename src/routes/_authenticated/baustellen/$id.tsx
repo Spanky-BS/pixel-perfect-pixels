@@ -14,7 +14,7 @@ import { MaterialEditor, MaterialList, useMaterials } from "@/components/job/Mat
 import { LabourEditor, LabourList, useLabour } from "@/components/job/LabourList";
 import { settingsQuery } from "@/lib/queries";
 import { StatusStepper } from "@/components/job/StatusStepper";
-import { AiAnalysis, OpenQuestions } from "@/components/job/AiAnalysis";
+import { OpenQuestions } from "@/components/job/AiAnalysis";
 import { CostEstimate } from "@/components/job/CostEstimate";
 import { Row } from "@/components/job/Kalkulation";
 import { Nachkalkulation } from "@/components/job/Nachkalkulation";
@@ -259,6 +259,17 @@ function JobPage() {
             }
           }}
           onDeleted={() => navigate({ to: "/baustellen" })}
+          onGoEstimate={async () => {
+            if (persisted === "Begehung") await setStatus("Grobkosten");
+            setSelectedWorkflowStep("Grobkosten");
+          }}
+          onWantsOffer={async () => {
+            const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
+            if (curIdx < PROJECT_STEPS.indexOf("Offerte")) await setStatus("Offerte");
+            setSelectedWorkflowStep("Offerte");
+            toast.success("Kunde will Offerte – weiter mit der Offerte");
+          }}
+          onDeclined={() => { setCancelReason("Kunde hat nach Grobkosten abgesagt"); setCancelOpen(true); }}
         />
       )}
 
@@ -341,6 +352,9 @@ function ProjectStepContent({
   onTouchOfferte,
   onComplete,
   onDeleted,
+  onGoEstimate,
+  onWantsOffer,
+  onDeclined,
 }: {
   step: string;
   job: Job & { customers?: { id: string; company_name: string | null; first_name: string | null; last_name: string | null } | null };
@@ -357,41 +371,29 @@ function ProjectStepContent({
   onTouchOfferte: () => void;
   onComplete: () => void;
   onDeleted: () => void;
+  onGoEstimate: () => void;
+  onWantsOffer: () => void;
+  onDeclined: () => void;
 }) {
   switch (step) {
     case "Begehung":
       return (
         <div className="space-y-6">
           <div className="space-y-2">{captureTiles}</div>
-          <OpenQuestions jobId={jobId} />
           <PhotoGallery jobId={jobId} />
           <DocumentList jobId={jobId} />
           <NotesList jobId={jobId} />
-          <section className="space-y-3">
-            <h2 className="section-title">Material manuell</h2>
-            <MaterialList jobId={jobId} onEdit={onEditMaterial} />
-            <Button variant="outline" className="h-12 w-full" onClick={onAddMaterial}>+ Material hinzufügen</Button>
-          </section>
-          <section className="space-y-3">
-            <h2 className="section-title">Arbeit manuell</h2>
-            <LabourList jobId={jobId} onEdit={onEditLabour} />
-            <Button variant="outline" className="h-12 w-full" onClick={onAddLabour}>+ Arbeitsleistung hinzufügen</Button>
-          </section>
+          <Button className="h-14 w-full text-base font-semibold" onClick={onGoEstimate}>Weiter zu Grobkosten</Button>
         </div>
       );
     case "Analyse":
-      return (
-        <div className="space-y-6">
-          <AiAnalysis jobId={jobId} onEditMaterial={onEditMaterial} onEditLabour={onEditLabour} />
-          <OpenQuestions jobId={jobId} />
-        </div>
-      );
     case "Grobkosten":
       return (
-        <section className="space-y-2">
+        <div className="space-y-4">
           <h2 className="section-title">Grobkostenschätzung</h2>
-          <CostEstimate jobId={jobId} />
-        </section>
+          <OpenQuestions jobId={jobId} />
+          <CostEstimate jobId={jobId} onWantsOffer={onWantsOffer} onDeclined={onDeclined} />
+        </div>
       );
     case "Produktauswahl":
     case "Kalkulation":

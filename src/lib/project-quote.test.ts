@@ -23,7 +23,7 @@ describe("project quote helpers", () => {
   });
 
   it("exposes the simplified project steps", () => {
-    expect([...PROJECT_STEPS]).toEqual(["Begehung", "Analyse", "Grobkosten", "Offerte", "Ausführung", "Rechnung", "Abgeschlossen"]);
+    expect([...PROJECT_STEPS]).toEqual(["Begehung", "Grobkosten", "Offerte", "Ausführung", "Rechnung", "Abgeschlossen"]);
     expect(normalizeStatus("project", "Produktauswahl")).toBe("Offerte");
   });
 

@@ -17,3 +17,18 @@ describe("price guide", () => {
     expect(r["Entsorgung"]).toBe(350);
   });
 });
+
+import { breakdownFromGuide as bd, estimateFromGuide as ef } from "./price-guide";
+import { normalizeStatus as ns } from "./app";
+describe("grobkosten workflow", () => {
+  it("breakdown lines add up to the section amounts", () => {
+    const m = [{ description: "Wand-WC", quantity: 1 }, { description: "Eckventil", quantity: 2 }];
+    const l = [{ description: "Montage", hours: 4, hourly_rate: 120 }];
+    const sum = bd(m, l).filter((x) => x.section === "Arbeitsaufwand").reduce((s, x) => s + x.amount, 0);
+    expect(sum).toBe(ef(m, l)["Arbeitsaufwand"]);
+    expect(sum).toBe(480);
+  });
+  it("old Analyse status maps onto Grobkosten", () => {
+    expect(ns("project", "Analyse")).toBe("Grobkosten");
+  });
+});
