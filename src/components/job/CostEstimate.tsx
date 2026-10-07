@@ -6,11 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
 import { CONFIDENCE, ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, formatDate, roundTo } from "@/lib/app";
+import { hourlyRateFromSettings, MISSING_RATE, settingNumber } from "@/lib/commercial";
+import { companyExperienceQuery } from "@/lib/company-experience-data";
+import { bucketForMaterials, estimateWithExperience } from "@/lib/company-experience";
 import { estimateFromGuide } from "@/lib/price-guide";
 
 export function CostEstimate({ jobId }: { jobId: string }) {
   const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
+  const experience = useQuery(companyExperienceQuery(jobId));
   const [sel, setSel] = useState<string | null>(null);
   const est = useQuery({
     queryKey: ["estimates", jobId],
@@ -25,26 +29,51 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
   async function guideAmounts() {
+    const rate = hourlyRateFromSettings(settings.data);
+    const tolerance = settingNumber(settings.data?.estimate_tolerance);
+    if (rate == null || tolerance == null) {
+      toast.error(rate == null ? MISSING_RATE : "Grobkosten-Toleranz fehlt in den Einstellungen.");
+      return null;
+    }
     const [{ data: lab }, { data: mat }] = await Promise.all([
-      supabase.from("labour_items").select("description, hours, hourly_rate, source").eq("job_id", jobId),
+      supabase.from("labour_items").select("description, hours, hourly_rate, source, item_type, parent_id").eq("job_id", jobId),
       supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
     ]);
-    return estimateFromGuide(
-      (mat ?? []).map((m) => ({ description: m.description, quantity: Number(m.quantity), category: (m.material_categories as { name: string } | null)?.name })),
-      (lab ?? []).filter((l) => l.source !== "execution").map((l) => ({ description: l.description, hours: Number(l.hours), hourly_rate: Number(l.hourly_rate) })),
-    );
+    const materials = (mat ?? []).map((m) => ({
+      description: m.description,
+      quantity: Number(m.quantity),
+      category: (m.material_categories as { name: string } | null)?.name ?? null,
+    }));
+    const labour = (lab ?? []).filter((l) => l.source !== "execution" && (l.item_type === "task" ? !l.parent_id : true)).map((l) => ({
+      description: l.description,
+      hours: Number(l.hours),
+      hourly_rate: rate,
+    }));
+    const guide = estimateFromGuide(materials, labour);
+    const priced = estimateWithExperience({
+      guide,
+      labour,
+      currentRate: rate,
+      bucket: bucketForMaterials("project", materials),
+      observations: experience.data?.observations ?? [],
+    });
+    const notes = priced.explanations.length
+      ? priced.explanations.join(" ")
+      : "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)";
+    return { amounts: priced.amounts, notes, tolerance };
   }
 
   async function create() {
-    const amounts = await guideAmounts();
+    const built = await guideAmounts();
+    if (!built) return;
     const { data, error } = await supabase.from("cost_estimates")
-      .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: Number(settings.data?.estimate_tolerance ?? 20), notes: "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)" })
+      .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: built.tolerance, notes: built.notes })
       .select("id").single();
     if (error) return toast.error(error.message);
     await supabase.from("cost_estimate_items").insert(ESTIMATE_SECTIONS.map((section, i) => ({
-      estimate_id: data.id, section, description: section, amount: amounts[section] ?? 0, sort_order: i,
+      estimate_id: data.id, section, description: section, amount: built.amounts[section] ?? 0, sort_order: i,
     })));
-    if (Object.keys(amounts).length) toast.success("Mit Richtwerten aus Material & Arbeit vorbefüllt");
+    toast.success(built.notes.startsWith("Vorbefüllt") ? "Mit Richtwerten aus Material & Arbeit vorbefüllt" : "Mit Firmenerfahrung und aktuellen Einstellungen vorbefüllt");
     setSel(data.id);
     refresh();
   }
@@ -55,16 +84,17 @@ export function CostEstimate({ jobId }: { jobId: string }) {
     if (!confirm("Beträge aus aktuellem Material & Arbeit neu berechnen? Manuell geänderte Beträge der Standard-Positionen werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
     setUpdating(true);
     try {
-      const amounts = await guideAmounts();
+      const built = await guideAmounts();
+      if (!built) return;
       const existing = cur.cost_estimate_items;
       await Promise.all(ESTIMATE_SECTIONS.map((section, i) => {
         const row = existing.find((it) => it.section === section && it.description === section)
           ?? existing.find((it) => it.section === section);
-        const amount = amounts[section] ?? 0;
+        const amount = built.amounts[section] ?? 0;
         if (row) return supabase.from("cost_estimate_items").update({ amount }).eq("id", row.id);
         return supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section, description: section, amount, sort_order: i });
       }));
-      await supabase.from("cost_estimates").update({ notes: `Aktualisiert am ${new Date().toLocaleString("de-CH")} aus Material & Arbeit` }).eq("id", cur.id);
+      await supabase.from("cost_estimates").update({ notes: built.notes }).eq("id", cur.id);
       toast.success("Grobkosten aktualisiert");
       refresh();
     } finally {
@@ -125,6 +155,7 @@ export function CostEstimate({ jobId }: { jobId: string }) {
         <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Orientierungsrahmen (±{tol}%)</div>
         <div className="font-mono text-lg">{formatCHF(roundTo(total * (1 - tol / 100)))} – {formatCHF(roundTo(total * (1 + tol / 100)))}</div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{ESTIMATE_DISCLAIMER}</p>
+        {cur.notes && <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{cur.notes}</p>}
       </div>
 
       <button onClick={update} disabled={updating} className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary font-semibold text-primary-foreground disabled:opacity-60">

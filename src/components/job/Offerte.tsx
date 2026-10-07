@@ -1,21 +1,21 @@
-import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, FileText, Pencil, Share2, Trash2 } from "lucide-react";
+import { Download, FileText, Share2 } from "lucide-react";
 import { downloadFile, elementToPdf, shareOrDownload } from "@/lib/pdf";
 import { SERVICE_REPORT_CSS } from "@/lib/service-report";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { MaterialList } from "@/components/job/MaterialList";
 import { useLabour } from "@/components/job/LabourList";
 import { useMaterials } from "@/components/job/MaterialList";
+import { OfferteLabour } from "@/components/job/OfferteLabour";
 import { Row } from "@/components/job/Kalkulation";
 import { settingsQuery } from "@/lib/queries";
+import { hourlyRateFromSettings } from "@/lib/commercial";
 import {
   COMPANY,
 } from "@/lib/company";
 import {
-  STANDARD_WORK_POSITIONS,
   address,
   customerName,
   formatCHF,
@@ -26,10 +26,9 @@ import {
   type Labour,
   type Material,
 } from "@/lib/app";
+import { ungroupedTasks } from "@/lib/labour-grouping";
 import { computeQuote, labourQuoteAmount, linkedProduct, quotedLabour } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
-
-const seedingJobs = new Set<string>();
 
 type JobWithCustomer = Job & { customers?: (Pick<Customer, "id" | "company_name" | "first_name" | "last_name"> & Partial<Customer>) | null | undefined };
 
@@ -112,132 +111,22 @@ function OfferteEdit({
   onConfirmed: () => void;
   onTouchOfferte: () => void;
 }) {
-  const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
   const labour = useLabour(jobId);
   const materials = useMaterials(jobId);
-  const quoted = quotedLabour(labour.data);
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
   const totals = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0));
 
-  useEffect(() => {
-    if (labour.isLoading || quoted.length) return;
-    void seedDefaults();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labour.isLoading, quoted.length]);
-
-  async function seedDefaults() {
-    if (locked || seedingJobs.has(jobId)) return;
-    seedingJobs.add(jobId);
-    try {
-      const { data: existing } = await supabase.from("labour_items").select("description").eq("job_id", jobId);
-      const have = new Set((existing ?? []).map((l) => l.description.trim().toLowerCase()));
-      const missing = STANDARD_WORK_POSITIONS.filter((t) => !have.has(t.toLowerCase()));
-      if (!missing.length) return;
-      const rate = Number(settings.data?.default_hourly_rate ?? 120);
-      const { error } = await supabase.from("labour_items").insert(
-        missing.map((title, i) => ({
-          job_id: jobId,
-          description: title,
-          hours: 0,
-          hourly_rate: rate,
-          notes: "",
-          source: "manual",
-          sort_order: i,
-        })),
-      );
-      if (error) return toast.error(error.message);
-      qc.invalidateQueries({ queryKey: ["labour", jobId] });
-      onTouchOfferte();
-    } finally {
-      seedingJobs.delete(jobId);
-    }
-  }
-
-  async function addMissingStandards() {
-    const have = new Set(quoted.map((l) => l.description.trim().toLowerCase()));
-    const missing = STANDARD_WORK_POSITIONS.filter((t) => !have.has(t.toLowerCase()));
-    if (!missing.length) return toast.message("Standardpositionen sind bereits vorhanden");
-    const rate = Number(settings.data?.default_hourly_rate ?? 120);
-    const { error } = await supabase.from("labour_items").insert(
-      missing.map((title, i) => ({
-        job_id: jobId,
-        description: title,
-        hours: 0,
-        hourly_rate: rate,
-        notes: "",
-        source: "manual",
-        sort_order: Date.now() % 1e9 + i,
-      })),
-    );
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["labour", jobId] });
-    onTouchOfferte();
-  }
-
-  async function removeLabour(l: Labour) {
-    if (!confirm("Position aus der Offerte entfernen?")) return;
-    const { error } = await supabase.from("labour_items").delete().eq("id", l.id);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["labour", jobId] });
-  }
-
   return (
     <div className="space-y-6">
-      <section className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold leading-snug">Arbeiten</h3>
-          {!locked && (
-            <button
-              type="button"
-              className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary"
-              onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) })}
-            >
-              + Position
-            </button>
-          )}
-        </div>
-        <div className="rounded-lg border border-border/80 bg-card">
-          {!quoted.length && <p className="px-3 py-4 text-sm text-muted-foreground">Noch keine Arbeitspositionen.</p>}
-          {quoted.map((l) => (
-            <div key={l.id} className="border-b border-border/70 px-3 py-3 last:border-b-0">
-              <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => !locked && onEditLabour(l)}
-                >
-                  <p className="font-semibold">{l.description || "–"}</p>
-                  {l.notes?.trim() && <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
-                  <p className="mt-1 font-mono text-sm text-muted-foreground">
-                    {Number(l.hours) > 0
-                      ? `${Number(l.hours).toLocaleString("de-CH")} h × ${formatCHF(Number(l.hourly_rate))}`
-                      : "Stunden noch offen"}
-                  </p>
-                </button>
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="font-mono text-sm font-medium">{formatCHF(labourQuoteAmount(l))}</span>
-                  {!locked && (
-                    <>
-                      <button type="button" aria-label="Bearbeiten" className="flex h-10 w-10 items-center justify-center text-muted-foreground" onClick={() => onEditLabour(l)}>
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button type="button" aria-label="Entfernen" className="flex h-10 w-10 items-center justify-center text-destructive" onClick={() => void removeLabour(l)}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {!locked && (
-          <button type="button" className="text-sm font-medium text-primary" onClick={() => void addMissingStandards()}>
-            Standardpositionen ergänzen
-          </button>
-        )}
-      </section>
+      <OfferteLabour
+        jobId={jobId}
+        locked={locked}
+        labour={labour.data}
+        hourlyRate={hourlyRateFromSettings(settings.data)}
+        onEditLabour={onEditLabour}
+        onTouchOfferte={onTouchOfferte}
+      />
 
       <section className="space-y-2">
         <div className="flex items-start justify-between gap-3">
@@ -273,6 +162,11 @@ function OfferteEdit({
         <FileText className="h-4 w-4" /> Offerte in Bexio erstellen (folgt)
       </button>
 
+      {!locked && ungroupedTasks(labour.data).length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {ungroupedTasks(labour.data).length} Aufgabe{ungroupedTasks(labour.data).length === 1 ? "" : "n"} noch nicht zugeordnet – sie erscheinen nicht in der Offerte.
+        </p>
+      )}
       {!locked && (
         <Button
           className="h-14 w-full text-base font-semibold"

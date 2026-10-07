@@ -11,9 +11,10 @@ import { Field } from "@/components/CustomerForm";
 import { StatusBadge } from "@/components/Brand";
 import { categoriesQuery } from "@/lib/queries";
 import { MATERIAL_STATUSES, UNITS, displayMaterialStatus, type Material } from "@/lib/app";
+import { recordSuggestionDecision } from "@/lib/company-experience-data";
 import { ProductSearch } from "./ProductSearch";
 
-type Draft = Partial<Material> & { job_id: string };
+type Draft = Partial<Material> & { job_id: string; suggestionId?: string; aiQuantity?: number };
 
 export function useMaterials(jobId: string) {
   return useQuery({
@@ -34,13 +35,26 @@ export function MaterialEditor({ draft, onClose }: { draft: Draft | null; onClos
 
   async function save() {
     if (!cur) return;
-    const { id, created_at, updated_at, user_id, products: _products, ...rest } = cur as Draft & { products?: unknown };
+    const { id, created_at, updated_at, user_id, products: _products, suggestionId, aiQuantity, ...rest } = cur as Draft & { products?: unknown };
     void created_at; void updated_at; void user_id; void _products;
     const payload = { ...rest, description: rest.description ?? "", job_id: cur.job_id };
     const { error } = id
       ? await supabase.from("material_requirements").update(payload).eq("id", id)
       : await supabase.from("material_requirements").insert({ ...payload, sort_order: Date.now() % 1_000_000_000 });
     if (error) return toast.error(error.message);
+    if (suggestionId) {
+      const saved = Number(cur.quantity ?? 0);
+      const changed = aiQuantity != null && Math.abs(saved - aiQuantity) > 0.001;
+      await recordSuggestionDecision(
+        suggestionId,
+        { beschreibung: rest.description ?? "", menge: aiQuantity ?? saved },
+        changed ? "edit" : "accept",
+        saved,
+        false,
+      );
+      qc.invalidateQueries({ queryKey: ["ai", cur.job_id] });
+      qc.invalidateQueries({ queryKey: ["company-experience"] });
+    }
     qc.invalidateQueries({ queryKey: ["materials", cur.job_id] });
     onClose();
   }

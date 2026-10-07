@@ -13,6 +13,7 @@ import { EXTRA_COST_KINDS, VEHICLE_KIND, defaultTechnician, UNITS, formatCHF, fo
 import { cropCanvasInk } from "@/lib/signature";
 import { isTravelLabour, isVehicleExtra, pickVehicleExtra } from "@/lib/service-billing";
 import { unitSalesPrice, type Product } from "@/lib/products";
+import { hourlyRateFromSettings, MISSING_RATE } from "@/lib/commercial";
 import { Row } from "./Kalkulation";
 
 export { isTravelLabour };
@@ -74,13 +75,14 @@ export function ServiceLabour({
   const settings = useQuery(settingsQuery());
   const { lab } = useServiceTotals(jobId);
   const [d, setD] = useState<AnyRow | null>(null);
-  const rate = Number(settings.data?.service_hourly_rate ?? settings.data?.default_hourly_rate ?? 120);
+  const rate = hourlyRateFromSettings(settings.data, "service");
   const technician = defaultTechnician(settings.data);
   const refresh = () => qc.invalidateQueries({ queryKey: ["service_labour_entries", jobId] });
 
   useEffect(() => {
     if (!startWith) return;
-    setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() });
+    if (rate == null) toast.error(MISSING_RATE);
+    else setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() });
     onStarted?.();
   }, [startWith]);
 
@@ -99,7 +101,10 @@ export function ServiceLabour({
   return (
     <div className={hideQuickActions ? "" : "space-y-3"}>
       {!hideQuickActions && (
-        <button className="action-tile-primary w-full" onClick={() => setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() })}><Plus className="h-6 w-6" />Arbeit erfassen</button>
+        <button className="action-tile-primary w-full" onClick={() => {
+          if (rate == null) return toast.error(MISSING_RATE);
+          setD({ job_id: jobId, description: "Service Sanitär", hours: 1, hourly_rate: rate, technician, start_at: new Date().toISOString() });
+        }}><Plus className="h-6 w-6" />Arbeit erfassen</button>
       )}
       {hideQuickActions ? null : <h3 className="text-sm font-medium">Arbeit</h3>}
       {work.map((r) => (

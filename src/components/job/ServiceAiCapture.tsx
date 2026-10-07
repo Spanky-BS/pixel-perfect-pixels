@@ -15,6 +15,7 @@ import { extractServiceCapture } from "@/lib/ai.functions";
 import { settingsQuery } from "@/lib/queries";
 import { VEHICLE_KIND, defaultTechnician, formatCHF } from "@/lib/app";
 import { pickVehicleExtra } from "@/lib/service-billing";
+import { hourlyRateFromSettings, MISSING_RATE } from "@/lib/commercial";
 
 type LabourDraft = { keep: boolean; description: string; hours: number };
 type MatDraft = { keep: boolean; description: string; quantity: number; unit: string; productId: string | null; productName: string | null; salesPrice: number };
@@ -94,7 +95,11 @@ export function ServiceAiCapture({
 
   async function apply() {
     const technician = defaultTechnician(settings.data);
-    const rate = Number(settings.data?.service_hourly_rate ?? settings.data?.default_hourly_rate ?? 120);
+    const rate = hourlyRateFromSettings(settings.data, "service");
+    if (rate == null) {
+      toast.error(MISSING_RATE);
+      return;
+    }
     try {
       for (const row of labour.filter((r) => r.keep)) {
         const { error } = await supabase.from("service_labour_entries").insert({
@@ -200,7 +205,7 @@ export function ServiceAiCapture({
                 <DraftCard key={`l${i}`} keep={row.keep} onKeep={(k) => setLabour(labour.map((r, j) => j === i ? { ...r, keep: k } : r))}>
                   <Field label="Beschreibung"><Input className="h-11 text-base" value={row.description} onChange={(e) => setLabour(labour.map((r, j) => j === i ? { ...r, description: e.target.value } : r))} /></Field>
                   <Field label="Stunden"><Input className="h-11 text-base" type="number" inputMode="decimal" step="0.25" value={row.hours} onChange={(e) => setLabour(labour.map((r, j) => j === i ? { ...r, hours: Number(e.target.value) } : r))} /></Field>
-                  <p className="text-xs text-muted-foreground">Techniker {defaultTechnician(settings.data)} · {formatCHF(Number(settings.data?.service_hourly_rate ?? settings.data?.default_hourly_rate ?? 120))}/h</p>
+                  <p className="text-xs text-muted-foreground">Techniker {defaultTechnician(settings.data)} · {hourlyRateFromSettings(settings.data, "service") == null ? "Ansatz in Einstellungen" : `${formatCHF(hourlyRateFromSettings(settings.data, "service") ?? 0)}/h`}</p>
                 </DraftCard>
               ))}
             </div>

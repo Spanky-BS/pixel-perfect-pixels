@@ -420,6 +420,7 @@ export type Database = {
           source: string
           updated_at: string
           user_id: string
+          work_key: string | null
         }
         Insert: {
           confidence?: string | null
@@ -436,6 +437,7 @@ export type Database = {
           source?: string
           updated_at?: string
           user_id?: string
+          work_key?: string | null
         }
         Update: {
           confidence?: string | null
@@ -452,6 +454,7 @@ export type Database = {
           source?: string
           updated_at?: string
           user_id?: string
+          work_key?: string | null
         }
         Relationships: [
           {
