@@ -97,6 +97,7 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
     const hours = Number(l.hours) || 0;
     const rate = Number(l.hourly_rate);
     totalHours += hours;
+    // Disposal work hours (loading/transport) count as normal labour; fees are the flat Entsorgung.
     const disposal = DISPOSAL_RE.test(l.description);
     const demo = !disposal && DEMO_RE.test(l.description);
     if (disposal) disposalLabour = true;
@@ -109,15 +110,15 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
       lines.push({ section: "Arbeitsaufwand", label: `Montage: ${l.description}`, detail: `${mh} h × ${rate} CHF (Anteil Montage)`, amount: Math.round(mh * rate) });
       continue;
     }
-    const section = disposal ? "Entsorgung" : demo ? "Demontage" : "Arbeitsaufwand";
+    const section = demo ? "Demontage" : "Arbeitsaufwand";
     lines.push({ section, label: l.description, detail: `${hours} h × ${rate} CHF`, amount: Math.round(hours * rate) });
     if (demo && hours > 0) demolitionHours += hours;
   }
   if (demolitionMentioned && demolitionHours === 0) {
     lines.push({ section: FLAT.demontage.section, label: "Demontage bestehender Apparate", detail: "Pauschale (keine Demontage-Stunden erfasst)", amount: mid(FLAT.demontage) });
   }
-  if (demolitionMentioned && !disposalLabour) {
-    lines.push({ section: "Entsorgung", label: "Entsorgung demontierter Teile", detail: "Pauschale", amount: DISPOSAL.flat });
+  if (demolitionMentioned || disposalLabour) {
+    lines.push({ section: "Entsorgung", label: "Entsorgung demontierter Teile", detail: "Pauschale (Gebühren)", amount: DISPOSAL.flat });
   }
   if (totalHours > 0) {
     const days = Math.ceil(totalHours / VEHICLE.hoursPerDay);

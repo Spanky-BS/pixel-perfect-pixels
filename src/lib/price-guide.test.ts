@@ -19,6 +19,11 @@ describe("price guide", () => {
   it("Entsorgung flat 350 when demolition exists", () => {
     expect(estimateFromGuide([], [{ description: "Demontage 2 x WC", hours: 1.5, hourly_rate: 120 }])["Entsorgung"]).toBe(350);
   });
+  it("Entsorgung stays 350 even with own disposal work; its hours go to Arbeitsaufwand", () => {
+    const r = estimateFromGuide([], [{ description: "Entsorgung altes Material", hours: 0.5, hourly_rate: 130 }]);
+    expect(r["Entsorgung"]).toBe(350);
+    expect(r["Arbeitsaufwand"]).toBe(65);
+  });
   it("Demontage und Remontage splits 40% Demontage / 60% Arbeitsaufwand", () => {
     const r = estimateFromGuide([], [{ description: "Demontage und Remontage von 1 Pissoir", hours: 2.5, hourly_rate: 100 }]);
     expect(r["Demontage"]).toBe(100);

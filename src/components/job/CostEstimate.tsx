@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
 import { ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, roundTo } from "@/lib/app";
-import { breakdownFromGuide, estimateFromGuide, type GuideLine } from "@/lib/price-guide";
+import { breakdownFromGuide, estimateFromGuide, type GuideLine, type GuideMaterial, type GuideLabour } from "@/lib/price-guide";
 import { useAnalyzeAndApply } from "@/components/job/AiAnalysis";
 
 export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: string; onWantsOffer: () => void; onDeclined: () => void }) {
@@ -60,6 +60,9 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
     try { await writeEstimate(); toast.success("Grobkosten berechnet"); } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
   }
   const [updating, setUpdating] = useState(false);
+  const [tolDraft, setTolDraft] = useState<number | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [custom, setCustom] = useState("");
   async function update() {
     setUpdating(true);
     try { await writeEstimate(); toast.success("Grobkosten aktualisiert"); } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); } finally { setUpdating(false); }
@@ -82,8 +85,12 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
 
   const items = [...cur.cost_estimate_items].sort((a, b) => a.sort_order - b.sort_order);
   const total = items.reduce((s, i) => s + Number(i.amount), 0);
-  const tol = Number(cur.tolerance);
+  const tol = tolDraft ?? Number(cur.tolerance);
   const shown = cur.visibility === "dem Kunden gezeigt";
+  const addItem = async (description: string) => {
+    await supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section: "Sonstiges", description, sort_order: items.length });
+    setAdding(false); setCustom(""); refresh();
+  };
 
   return (
     <div className="space-y-3">
@@ -91,7 +98,12 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
       <div className="rounded-xl border-2 border-primary bg-card p-4">
         <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Geschätzte Kosten (exkl. MWST)</div>
         <div className="font-mono text-3xl font-medium text-primary">{formatCHF(roundTo(total))}</div>
-        <div className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rahmen ±{tol}%</div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rahmen ±%</span>
+          <Input className="h-11 w-24 text-right text-base" type="number" inputMode="decimal" value={tolDraft ?? String(cur.tolerance)}
+            onChange={(e) => setTolDraft(e.target.value === "" ? 0 : Number(e.target.value))}
+            onBlur={async () => { if (tolDraft === null) return; await supabase.from("cost_estimates").update({ tolerance: tolDraft }).eq("id", cur.id); await qc.invalidateQueries({ queryKey: ["estimates", jobId] }); setTolDraft(null); }} />
+        </div>
         <div className="font-mono text-lg">{formatCHF(roundTo(total * (1 - tol / 100)))} – {formatCHF(roundTo(total * (1 + tol / 100)))}</div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{ESTIMATE_DISCLAIMER}</p>
       </div>
@@ -102,15 +114,24 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
 
       <div className="divide-y rounded-xl border bg-card">
         {items.map((it) => <EstimateRow key={it.id} item={it} lines={(lines.data ?? []).filter((l) => l.section === it.section && it.description === it.section)} onChange={refresh} />)}
-        <button onClick={async () => { await supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section: "Sonstiges", description: "Neue Position", sort_order: items.length }); refresh(); }}
-          className="flex h-12 w-full items-center justify-center gap-1 text-sm font-semibold text-primary"><Plus className="h-4 w-4" /> Position hinzufügen</button>
+        {adding ? (
+          <div className="space-y-2 p-3">
+            <div className="flex flex-wrap gap-2">
+              {ADD_PRESETS.map((p) => (
+                <button key={p} onClick={() => addItem(p)} className="min-h-11 rounded-full border bg-muted/50 px-3 text-sm font-medium">{p}</button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input className="h-11 flex-1 text-base" placeholder="Eigene Position…" value={custom} onChange={(e) => setCustom(e.target.value)} />
+              <button disabled={!custom.trim()} onClick={() => addItem(custom.trim())} className="h-11 rounded-lg bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50">Hinzufügen</button>
+            </div>
+            <button onClick={() => setAdding(false)} className="h-10 w-full text-sm text-muted-foreground">Abbrechen</button>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)}
+            className="flex h-12 w-full items-center justify-center gap-1 text-sm font-semibold text-primary"><Plus className="h-4 w-4" /> Position hinzufügen</button>
+        )}
       </div>
-
-      <label className="flex items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2">
-        <span className="text-sm font-medium">Toleranz ±%</span>
-        <Input key={cur.id + "t"} className="h-11 w-24 text-right text-base" type="number" inputMode="decimal" defaultValue={tol}
-          onBlur={async (e) => { await supabase.from("cost_estimates").update({ tolerance: Number(e.target.value) || 0 }).eq("id", cur.id); refresh(); }} />
-      </label>
 
       <section className="space-y-2 rounded-2xl border border-primary/20 bg-primary/[0.04] p-4">
         <h3 className="text-base font-semibold">Dem Kunden gezeigt – wie geht es weiter?</h3>
@@ -128,11 +149,27 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
   );
 }
 
+const ADD_PRESETS = [
+  "Bohr- und Spitzarbeiten",
+  "Gerüst / Abdeckarbeiten",
+  "Platten- / Gipserarbeiten",
+  "Elektroanschluss / Zuleitung",
+  "Zusätzliche Sanitärapparate",
+  "Zusätzliche Armaturen",
+  "Zusätzlicher Arbeitsaufwand",
+  "Spezialentsorgung / Mulde",
+];
+
+/** Begehung data drives the numbers: with no captures left, everything is 0. */
 async function guideInput(jobId: string) {
-  const [{ data: lab }, { data: mat }] = await Promise.all([
+  const [{ data: lab }, { data: mat }, { count: nNotes }, { count: nPhotos }, { count: nDocs }] = await Promise.all([
     supabase.from("labour_items").select("description, hours, hourly_rate, source").eq("job_id", jobId),
     supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
+    supabase.from("voice_notes").select("id", { count: "exact", head: true }).eq("job_id", jobId),
+    supabase.from("job_photos").select("id", { count: "exact", head: true }).eq("job_id", jobId),
+    supabase.from("job_documents").select("id", { count: "exact", head: true }).eq("job_id", jobId),
   ]);
+  if (!(nNotes || nPhotos || nDocs)) return [[] as GuideMaterial[], [] as GuideLabour[]] as const;
   return [
     (mat ?? []).map((m) => ({ description: m.description, quantity: Number(m.quantity), category: (m.material_categories as { name: string } | null)?.name })),
     (lab ?? []).filter((l) => l.source !== "execution").map((l) => ({ description: l.description, hours: Number(l.hours), hourly_rate: Number(l.hourly_rate) })),
