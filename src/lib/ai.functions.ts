@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { completeChat } from "@/lib/ai/provider";
+import { inlineImageParts } from "@/lib/ai/inline-images.server";
 import { classifyDoc, extractDocumentBytes } from "@/lib/ai/extract-document";
 import { nameOverlap } from "@/lib/invoice-match";
 import { unitSalesPrice } from "@/lib/products";
@@ -127,8 +128,7 @@ export const analyzeJob = createServerFn({ method: "POST" })
     const content: Array<Record<string, unknown>> = [{ type: "text", text }];
     const imagePaths = [...photos.map((p) => p.storage_path), ...docImagePaths].slice(0, 8);
     if (imagePaths.length) {
-      const { data: urls } = await sb.storage.from("job-media").createSignedUrls(imagePaths, 600);
-      urls?.forEach((u) => u.signedUrl && content.push({ type: "image_url", image_url: { url: u.signedUrl } }));
+      content.push(...(await inlineImageParts(sb as never, imagePaths)));
     }
 
     const { toolArguments } = await completeChat({
@@ -280,8 +280,7 @@ export const extractServiceCapture = createServerFn({ method: "POST" })
 
     const content: Array<Record<string, unknown>> = [{ type: "text", text }];
     if (imagePaths.length) {
-      const { data: urls } = await sb.storage.from("job-media").createSignedUrls(imagePaths, 600);
-      urls?.forEach((u) => u.signedUrl && content.push({ type: "image_url", image_url: { url: u.signedUrl } }));
+      content.push(...(await inlineImageParts(sb as never, imagePaths)));
     }
 
     const { toolArguments } = await completeChat({
@@ -438,8 +437,7 @@ export const extractProjectExecution = createServerFn({ method: "POST" })
 
     const content: Array<Record<string, unknown>> = [{ type: "text", text }];
     if (imagePaths.length) {
-      const { data: urls } = await sb.storage.from("job-media").createSignedUrls(imagePaths, 600);
-      urls?.forEach((u) => u.signedUrl && content.push({ type: "image_url", image_url: { url: u.signedUrl } }));
+      content.push(...(await inlineImageParts(sb as never, imagePaths)));
     }
 
     const { toolArguments } = await completeChat({
