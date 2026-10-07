@@ -15,6 +15,7 @@ Wenn etwas unklar ist, lasse das Feld leer und erstelle stattdessen einen offene
 "genaue Dimension unklar", "Modell noch offen", "Anschlussart prüfen", "Farbe mit Kunde bestätigen", "vorhandene Leitung prüfen", "Ausführung vor Ort klären".
 Unterlagen (PDF-Text, CSV, Excel) nur verwenden, soweit der Inhalt vorliegt. Erfinde nichts aus Dateinamen.
 Notizen der Form "Antwort zu «Frage»: ..." sind verbindliche Antworten des Installateurs: nutze sie, stelle diese Frage NICHT erneut. Stelle nur Fragen, die für die Kostenschätzung wirklich relevant sind.
+Gib für JEDE Arbeit realistische Stunden an (fachliche Schätzung eines Schweizer Sanitärmonteurs, 0.25-h-Schritte), und berücksichtige die Menge: "Demontage 2 x WC" = Aufwand für beide WC (z.B. 2 x 0.75 h = 1.5 h). Richtwerte: WC demontieren ca. 0.75 h/Stk, Waschtischarmatur demontieren ca. 0.5 h/Stk, Accessoire (Halter, Spender) ca. 0.25 h/Stk, Heizkörper entleeren ca. 0.5 h/Stk, WC montieren und anschliessen ca. 2 h/Stk. Setze nicht pauschal 1 h.
 Gib für jede Position eine Sicherheit an: niedrig, mittel oder hoch. Antworte auf Deutsch (Schweiz, ohne ß).`;
 
 const tool = {
@@ -41,8 +42,8 @@ const tool = {
           type: "array",
           items: {
             type: "object",
-            properties: { beschreibung: { type: "string" }, stunden: { type: "number" }, notiz: { type: "string" }, sicherheit: { type: "string", enum: ["niedrig", "mittel", "hoch"] } },
-            required: ["beschreibung", "sicherheit"],
+            properties: { beschreibung: { type: "string" }, stunden: { type: "number", description: "Geschaetzter Aufwand in Stunden fuer die genannte Menge, in 0.25-h-Schritten" }, notiz: { type: "string" }, sicherheit: { type: "string", enum: ["niedrig", "mittel", "hoch"] } },
+            required: ["beschreibung", "stunden", "sicherheit"],
           },
         },
         offene_punkte: { type: "array", items: { type: "string" } },

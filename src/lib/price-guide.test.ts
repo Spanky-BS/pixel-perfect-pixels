@@ -11,10 +11,22 @@ describe("price guide", () => {
   it("labour = hours x rate", () => {
     expect(estimateFromGuide([], [{ description: "Montage", hours: 4, hourly_rate: 120 }])["Arbeitsaufwand"]).toBe(480);
   });
-  it("demolition adds Demontage 850 and Entsorgung 350", () => {
-    const r = estimateFromGuide([], [{ description: "Demontage altes Lavabo", hours: 1, hourly_rate: 120 }]);
-    expect(r["Demontage"]).toBe(850);
-    expect(r["Entsorgung"]).toBe(350);
+  it("demolition labour goes to Demontage, not Arbeitsaufwand", () => {
+    const r = estimateFromGuide([], [{ description: "Demontage 2 x WC", hours: 2, hourly_rate: 120 }]);
+    expect(r["Demontage"]).toBe(240);
+    expect(r["Arbeitsaufwand"]).toBeUndefined();
+  });
+  it("Entsorgung minimum 150 for 3 parts", () => {
+    const r = estimateFromGuide([], [{ description: "Demontage 2 x WC", hours: 1.5, hourly_rate: 120 }, { description: "Demontage 1 x Pissoir", hours: 0.75, hourly_rate: 120 }]);
+    expect(r["Entsorgung"]).toBe(150);
+  });
+  it("Entsorgung 40 CHF per part: 5 parts = 200", () => {
+    const r = estimateFromGuide([], [{ description: "Demontage 5 x Papierhalter", hours: 1, hourly_rate: 120 }]);
+    expect(r["Entsorgung"]).toBe(200);
+  });
+  it("flat Demontage 850 only without demolition hours", () => {
+    expect(estimateFromGuide([{ description: "Demontage altes Lavabo", quantity: 1 }], [])["Demontage"]).toBe(850);
+    expect(estimateFromGuide([], [{ description: "Demontage Lavabo", hours: 1, hourly_rate: 120 }])["Demontage"]).toBe(120);
   });
 });
 

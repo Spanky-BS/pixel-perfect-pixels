@@ -47,7 +47,9 @@ export function useAnalyzeAndApply(jobId: string) {
       }).filter((m) => m.description);
       const labs = (rows ?? []).filter((x) => x.kind === "labour").map((x, i) => {
         const p = (x.payload ?? {}) as P;
-        return { job_id: jobId, description: s(p["beschreibung"]) ?? "", hours: n(p["stunden"], 1), hourly_rate: rate, notes: s(p["notiz"]), source: "ai", sort_order: (Date.now() % 1e9) + i };
+        const h = typeof p["stunden"] === "number" && p["stunden"] > 0 ? p["stunden"] : null;
+        const note = [s(p["notiz"]), h ? null : "Stunden geschätzt – prüfen"].filter(Boolean).join(" · ") || null;
+        return { job_id: jobId, description: s(p["beschreibung"]) ?? "", hours: h ?? 1, hourly_rate: rate, notes: note, source: "ai", sort_order: (Date.now() % 1e9) + i };
       }).filter((l) => l.description);
       const opens = (rows ?? []).filter((x) => x.kind === "open").map((x) => ({ job_id: jobId, text: String(((x.payload ?? {}) as P)["text"] ?? ""), source: "ai" })).filter((o) => o.text);
       const results = await Promise.all([
