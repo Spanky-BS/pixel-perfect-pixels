@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
 import { ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, roundTo } from "@/lib/app";
-import { breakdownFromGuide, estimateFromGuide, type GuideLine } from "@/lib/price-guide";
+import { breakdownFromGuide, estimateFromGuide, type GuideLine, type GuideMaterial, type GuideLabour } from "@/lib/price-guide";
 import { useAnalyzeAndApply } from "@/components/job/AiAnalysis";
 
 export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: string; onWantsOffer: () => void; onDeclined: () => void }) {
@@ -169,7 +169,7 @@ async function guideInput(jobId: string) {
     supabase.from("job_photos").select("id", { count: "exact", head: true }).eq("job_id", jobId),
     supabase.from("job_documents").select("id", { count: "exact", head: true }).eq("job_id", jobId),
   ]);
-  if (!(nNotes || nPhotos || nDocs)) return [[], []] as const;
+  if (!(nNotes || nPhotos || nDocs)) return [[] as GuideMaterial[], [] as GuideLabour[]] as const;
   return [
     (mat ?? []).map((m) => ({ description: m.description, quantity: Number(m.quantity), category: (m.material_categories as { name: string } | null)?.name })),
     (lab ?? []).filter((l) => l.source !== "execution").map((l) => ({ description: l.description, hours: Number(l.hours), hourly_rate: Number(l.hourly_rate) })),
