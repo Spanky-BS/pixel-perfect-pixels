@@ -13,6 +13,7 @@ WICHTIG: Erfinde KEINE fehlenden technischen Informationen (Dimensionen, Modelle
 Wenn etwas unklar ist, lasse das Feld leer und erstelle stattdessen einen offenen Punkt, z.B.
 "genaue Dimension unklar", "Modell noch offen", "Anschlussart prüfen", "Farbe mit Kunde bestätigen", "vorhandene Leitung prüfen", "Ausführung vor Ort klären".
 Unterlagen (PDF-Text, CSV, Excel) nur verwenden, soweit der Inhalt vorliegt. Erfinde nichts aus Dateinamen.
+Notizen der Form "Antwort zu «Frage»: ..." sind verbindliche Antworten des Installateurs: nutze sie, stelle diese Frage NICHT erneut. Stelle nur Fragen, die für die Kostenschätzung wirklich relevant sind.
 Gib für jede Position eine Sicherheit an: niedrig, mittel oder hoch. Antworte auf Deutsch (Schweiz, ohne ß).`;
 
 const tool = {

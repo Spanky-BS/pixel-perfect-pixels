@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, X, Plus, Trash2, RotateCcw } from "lucide-react";
+import { Check, X, Plus, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { analyzeJob } from "@/lib/ai.functions";
@@ -158,4 +158,3 @@ function OpenRow({ q, onAnswer, onStatus }: { q: { text: string }; onAnswer: (a:
   );
 }
 
-export { Trash2 };
