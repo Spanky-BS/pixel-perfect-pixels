@@ -129,7 +129,7 @@ export const statusTone: Record<string, string> = {
 export type JobType = "project" | "service";
 export const JOB_TYPE_LABEL: Record<JobType, string> = { project: "Projekt", service: "Regie / Service" };
 
-export const PROJECT_STEPS = ["Begehung", "Analyse", "Grobkosten", "Offerte", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
+export const PROJECT_STEPS = ["Begehung", "Grobkosten", "Offerte", "Ausführung", "Rechnung", "Abgeschlossen"] as const;
 /** Legacy persisted values; UI uses displayServiceStatus. */
 export const SERVICE_STEPS = ["Neu", "Geplant", "In Arbeit", "Erledigt", "Verrechnet"] as const;
 export const SERVICE_DISPLAY_STATUSES = ["Offen", "Erledigt", "Verrechnet", "Abgesagt"] as const;
@@ -143,6 +143,7 @@ export function stepLabel(type: string, step: string) {
 const LEGACY: Record<string, string> = {
   Neu: "Begehung",
   Aufnahme: "Begehung",
+  Analyse: "Grobkosten",
   Materialauswahl: "Offerte",
   Produktauswahl: "Offerte",
   Kalkulation: "Offerte",
