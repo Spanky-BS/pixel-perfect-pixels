@@ -16,11 +16,13 @@ const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v
 export const answerPrefix = (question: string) => `Antwort zu «${question}»: `;
 
 /** Removes everything the AI created for this job (manual items and clarified questions stay). */
-export async function clearAiItems(jobId: string) {
+export async function clearAiItems(jobId: string, everything = false) {
   await Promise.all([
     supabase.from("labour_items").delete().eq("job_id", jobId).eq("source", "ai"),
     supabase.from("material_requirements").delete().eq("job_id", jobId).eq("source", "ai"),
-    supabase.from("open_questions").delete().eq("job_id", jobId).eq("source", "ai").neq("status", "geklärt"),
+    everything
+      ? supabase.from("open_questions").delete().eq("job_id", jobId)
+      : supabase.from("open_questions").delete().eq("job_id", jobId).eq("source", "ai").neq("status", "geklärt"),
   ]);
 }
 
@@ -41,7 +43,7 @@ export function useAnalyzeAndApply(jobId: string) {
     try {
       const r = await run({ data: { jobId } });
       if (r.nothingNew) {
-        await clearAiItems(jobId);
+        await clearAiItems(jobId, true);
         ["materials", "labour", "open", "ai"].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
         toast.message("Begehung ist leer – KI-Positionen und offene Fragen entfernt.");
         return true;

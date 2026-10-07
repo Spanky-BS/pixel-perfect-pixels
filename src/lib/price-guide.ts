@@ -56,9 +56,9 @@ export const DEMO_SHARE = 0.4;
 /** Flat disposal when demolition is mentioned and no own disposal work exists. */
 export const DISPOSAL = { flat: 350 };
 /** Vehicle fee per started 8-hour working day. */
-export const VEHICLE = { perDay: 75, hoursPerDay: 8 };
+export const VEHICLE = { perDay: 50, hoursPerDay: 8 };
 /** Kleinmaterial and Reserve as share of the running total. */
-export const SMALL_MATERIAL_RATE = 0.2;
+export const SMALL_MATERIAL_RATE = 0.05;
 export const RESERVE_RATE = 0.1;
 export const RESERVE_SECTION = "Reserve / Unvorhergesehenes";
 
@@ -80,7 +80,11 @@ export function splitObject(description: string): string {
     .replace(/[,]+/g, " ").replace(/\s+/g, " ").trim() || description;
 }
 
-export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]): GuideLine[] {
+export type GuideRates = { vehiclePerDay?: number; smallMaterialPct?: number };
+
+export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[], rates: GuideRates = {}): GuideLine[] {
+  const perDay = rates.vehiclePerDay ?? VEHICLE.perDay;
+  const smallRate = rates.smallMaterialPct != null ? rates.smallMaterialPct / 100 : SMALL_MATERIAL_RATE;
   const lines: GuideLine[] = [];
   let demolitionMentioned = false;
   let demolitionHours = 0;
@@ -137,12 +141,12 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
   }
   if (totalHours > 0) {
     const days = Math.ceil(totalHours / VEHICLE.hoursPerDay);
-    lines.push({ section: "Fahrzeugpauschale", label: "Fahrzeugpauschale", detail: `${days} Tag(e) × ${VEHICLE.perDay} CHF (je ${VEHICLE.hoursPerDay} h, total ${totalHours} h)`, amount: days * VEHICLE.perDay });
+    lines.push({ section: "Fahrzeugpauschale", label: "Fahrzeugpauschale", detail: `${days} Tag(e) × ${perDay} CHF (je ${VEHICLE.hoursPerDay} h, total ${totalHours} h)`, amount: days * perDay });
   }
   const sum = () => lines.reduce((s, x) => s + x.amount, 0);
   const base = sum();
   if (base > 0) {
-    lines.push({ section: "Kleinmaterial", label: "Kleinmaterial pauschal", detail: `${SMALL_MATERIAL_RATE * 100}% von CHF ${base}`, amount: Math.round(base * SMALL_MATERIAL_RATE) });
+    lines.push({ section: "Kleinmaterial", label: "Kleinmaterial pauschal", detail: `${Math.round(smallRate * 1000) / 10}% von CHF ${base}`, amount: Math.round(base * smallRate) });
     const withSmall = sum();
     lines.push({ section: RESERVE_SECTION, label: "Reserve", detail: `${RESERVE_RATE * 100}% von CHF ${withSmall}`, amount: Math.round(withSmall * RESERVE_RATE) });
   }
@@ -150,9 +154,9 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
 }
 
 /** Returns amount per estimate section, pre-filled from reference prices. */
-export function estimateFromGuide(materials: GuideMaterial[], labour: GuideLabour[]) {
+export function estimateFromGuide(materials: GuideMaterial[], labour: GuideLabour[], rates: GuideRates = {}) {
   const out: Record<string, number> = {};
-  for (const l of breakdownFromGuide(materials, labour)) out[l.section] = (out[l.section] ?? 0) + l.amount;
+  for (const l of breakdownFromGuide(materials, labour, rates)) out[l.section] = (out[l.section] ?? 0) + l.amount;
   for (const k of Object.keys(out)) out[k] = Math.round(out[k] ?? 0);
   return out;
 }
