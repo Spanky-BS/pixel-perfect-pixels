@@ -1076,8 +1076,6 @@ export type Database = {
           default_material_markup: number
           default_technician: string
           estimate_tolerance: number
-          estimate_small_material_pct: number
-          estimate_vehicle_per_day: number
           service_hourly_rate: number
           small_material_allowance: number
           technician_city: string | null
@@ -1100,8 +1098,6 @@ export type Database = {
           default_material_markup?: number
           default_technician?: string
           estimate_tolerance?: number
-          estimate_small_material_pct?: number
-          estimate_vehicle_per_day?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
@@ -1124,8 +1120,6 @@ export type Database = {
           default_material_markup?: number
           default_technician?: string
           estimate_tolerance?: number
-          estimate_small_material_pct?: number
-          estimate_vehicle_per_day?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
