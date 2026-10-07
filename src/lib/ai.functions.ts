@@ -16,6 +16,7 @@ Wenn etwas unklar ist, lasse das Feld leer und erstelle stattdessen einen offene
 Unterlagen (PDF-Text, CSV, Excel) nur verwenden, soweit der Inhalt vorliegt. Erfinde nichts aus Dateinamen.
 Notizen der Form "Antwort zu «Frage»: ..." sind verbindliche Antworten des Installateurs: nutze sie, stelle diese Frage NICHT erneut. Stelle nur Fragen, die für die Kostenschätzung wirklich relevant sind.
 Gib für JEDE Arbeit realistische Stunden an (fachliche Schätzung eines Schweizer Sanitärmonteurs, 0.25-h-Schritte), und berücksichtige die Menge: "Demontage 2 x WC" = Aufwand für beide WC (z.B. 2 x 0.75 h = 1.5 h). Richtwerte: WC demontieren ca. 0.75 h/Stk, Waschtischarmatur demontieren ca. 0.5 h/Stk, Accessoire (Halter, Spender) ca. 0.25 h/Stk, Heizkörper entleeren ca. 0.5 h/Stk, WC montieren und anschliessen ca. 2 h/Stk. Setze nicht pauschal 1 h.
+"Demontage und Remontage/Wiedermontage" IMMER in zwei getrennte Arbeiten aufteilen, z.B. "Demontage 1 x Pissoir" und "Montage 1 x Pissoir", je mit eigenen Stunden. Entsorgung, Fahrzeugpauschale, Kleinmaterial und Reserve NICHT als Positionen erfassen, das rechnet die App selbst.
 Gib für jede Position eine Sicherheit an: niedrig, mittel oder hoch. Antworte auf Deutsch (Schweiz, ohne ß).`;
 
 const tool = {

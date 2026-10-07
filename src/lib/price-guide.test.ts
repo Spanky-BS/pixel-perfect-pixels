@@ -16,13 +16,22 @@ describe("price guide", () => {
     expect(r["Demontage"]).toBe(240);
     expect(r["Arbeitsaufwand"]).toBeUndefined();
   });
-  it("Entsorgung minimum 150 for 3 parts", () => {
-    const r = estimateFromGuide([], [{ description: "Demontage 2 x WC", hours: 1.5, hourly_rate: 120 }, { description: "Demontage 1 x Pissoir", hours: 0.75, hourly_rate: 120 }]);
-    expect(r["Entsorgung"]).toBe(150);
+  it("Entsorgung flat 350 when demolition exists", () => {
+    expect(estimateFromGuide([], [{ description: "Demontage 2 x WC", hours: 1.5, hourly_rate: 120 }])["Entsorgung"]).toBe(350);
   });
-  it("Entsorgung 40 CHF per part: 5 parts = 200", () => {
-    const r = estimateFromGuide([], [{ description: "Demontage 5 x Papierhalter", hours: 1, hourly_rate: 120 }]);
-    expect(r["Entsorgung"]).toBe(200);
+  it("Demontage und Remontage splits 40% Demontage / 60% Arbeitsaufwand", () => {
+    const r = estimateFromGuide([], [{ description: "Demontage und Remontage von 1 Pissoir", hours: 2.5, hourly_rate: 100 }]);
+    expect(r["Demontage"]).toBe(100);
+    expect(r["Arbeitsaufwand"]).toBe(150);
+  });
+  it("Fahrzeugpauschale 75 per started 8 h", () => {
+    expect(estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(75);
+    expect(estimateFromGuide([], [{ description: "Montage", hours: 9, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(150);
+  });
+  it("Kleinmaterial 20% of total, Reserve 10% of total incl. Kleinmaterial", () => {
+    const r = estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 115.625 }]);
+    expect(r["Kleinmaterial"]).toBe(200);
+    expect(r["Reserve / Unvorhergesehenes"]).toBe(120);
   });
   it("flat Demontage 850 only without demolition hours", () => {
     expect(estimateFromGuide([{ description: "Demontage altes Lavabo", quantity: 1 }], [])["Demontage"]).toBe(850);

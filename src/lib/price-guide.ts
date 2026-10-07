@@ -49,8 +49,18 @@ export type GuideLine = { section: string; label: string; detail: string; amount
 /** Every material/labour line with the section and amount it contributes to the estimate. */
 const DEMO_RE = /demont|rückbau|rueckbau|abbruch|entleer|verzapf/i;
 const DISPOSAL_RE = /entsorg|abtransport|mulde/i;
-/** Disposal per demolished part, with a minimum. */
-export const DISPOSAL = { perPart: 40, min: 150 };
+/** Work that contains both removal and (re)installation, e.g. "Demontage und Remontage". */
+const REMOUNT_RE = /remont|wiedermont|wieder\s*mont|wiederanschl|wieder\s*anschl|neu\s*mont|und\s+montage/i;
+/** Share of a combined line that counts as Demontage; the rest is Arbeitsaufwand. */
+export const DEMO_SHARE = 0.4;
+/** Flat disposal when demolition is mentioned and no own disposal work exists. */
+export const DISPOSAL = { flat: 350 };
+/** Vehicle fee per started 8-hour working day. */
+export const VEHICLE = { perDay: 75, hoursPerDay: 8 };
+/** Kleinmaterial and Reserve as share of the running total. */
+export const SMALL_MATERIAL_RATE = 0.2;
+export const RESERVE_RATE = 0.1;
+export const RESERVE_SECTION = "Reserve / Unvorhergesehenes";
 
 /** "Demontage 2 x WC" -> 2; falls back to 1. */
 export function partsIn(text: string): number {
@@ -58,18 +68,19 @@ export function partsIn(text: string): number {
   return m ? Math.max(1, Math.round(Number(m[1]!.replace(",", ".")))) : 1;
 }
 
+const q4 = (h: number) => Math.round(h * 4) / 4;
+
 /** Every material/labour line with the section and amount it contributes to the estimate. */
 export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]): GuideLine[] {
   const lines: GuideLine[] = [];
   let demolitionMentioned = false;
   let demolitionHours = 0;
-  let parts = 0;
+  let totalHours = 0;
   let disposalLabour = false;
   for (const m of materials) {
     const text = `${m.category ?? ""} ${m.description}`;
     if (/demont|rückbau|rueckbau|^alt|\balte[sr]?\b/i.test(m.description)) {
       demolitionMentioned = true;
-      parts += Number(m.quantity) > 0 ? Number(m.quantity) : 1;
       continue;
     }
     const g = matchGuide(text);
@@ -83,24 +94,41 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
     });
   }
   for (const l of labour) {
-    const hours = Number(l.hours);
+    const hours = Number(l.hours) || 0;
+    const rate = Number(l.hourly_rate);
+    totalHours += hours;
     const disposal = DISPOSAL_RE.test(l.description);
     const demo = !disposal && DEMO_RE.test(l.description);
-    const section = disposal ? "Entsorgung" : demo ? "Demontage" : "Arbeitsaufwand";
-    lines.push({ section, label: l.description, detail: `${hours} h × ${Number(l.hourly_rate)} CHF`, amount: Math.round(hours * Number(l.hourly_rate)) });
     if (disposal) disposalLabour = true;
-    if (demo) {
-      demolitionMentioned = true;
-      if (hours > 0) demolitionHours += hours;
-      if (/demont|rückbau|rueckbau|abbruch/i.test(l.description)) parts += partsIn(l.description);
+    if (demo) demolitionMentioned = true;
+    if (demo && REMOUNT_RE.test(l.description) && hours > 0) {
+      const dh = q4(hours * DEMO_SHARE);
+      const mh = hours - dh;
+      demolitionHours += dh;
+      lines.push({ section: "Demontage", label: `Demontage: ${l.description}`, detail: `${dh} h × ${rate} CHF (Anteil Demontage)`, amount: Math.round(dh * rate) });
+      lines.push({ section: "Arbeitsaufwand", label: `Montage: ${l.description}`, detail: `${mh} h × ${rate} CHF (Anteil Montage)`, amount: Math.round(mh * rate) });
+      continue;
     }
+    const section = disposal ? "Entsorgung" : demo ? "Demontage" : "Arbeitsaufwand";
+    lines.push({ section, label: l.description, detail: `${hours} h × ${rate} CHF`, amount: Math.round(hours * rate) });
+    if (demo && hours > 0) demolitionHours += hours;
   }
   if (demolitionMentioned && demolitionHours === 0) {
     lines.push({ section: FLAT.demontage.section, label: "Demontage bestehender Apparate", detail: "Pauschale (keine Demontage-Stunden erfasst)", amount: mid(FLAT.demontage) });
   }
   if (demolitionMentioned && !disposalLabour) {
-    const n = Math.max(1, parts);
-    lines.push({ section: "Entsorgung", label: "Entsorgung demontierter Teile", detail: `${n} Teile × ${DISPOSAL.perPart} CHF (mind. ${DISPOSAL.min} CHF)`, amount: Math.max(DISPOSAL.min, n * DISPOSAL.perPart) });
+    lines.push({ section: "Entsorgung", label: "Entsorgung demontierter Teile", detail: "Pauschale", amount: DISPOSAL.flat });
+  }
+  if (totalHours > 0) {
+    const days = Math.ceil(totalHours / VEHICLE.hoursPerDay);
+    lines.push({ section: "Fahrzeugpauschale", label: "Fahrzeugpauschale", detail: `${days} Tag(e) × ${VEHICLE.perDay} CHF (je ${VEHICLE.hoursPerDay} h, total ${totalHours} h)`, amount: days * VEHICLE.perDay });
+  }
+  const sum = () => lines.reduce((s, x) => s + x.amount, 0);
+  const base = sum();
+  if (base > 0) {
+    lines.push({ section: "Kleinmaterial", label: "Kleinmaterial pauschal", detail: `${SMALL_MATERIAL_RATE * 100}% von CHF ${base}`, amount: Math.round(base * SMALL_MATERIAL_RATE) });
+    const withSmall = sum();
+    lines.push({ section: RESERVE_SECTION, label: "Reserve", detail: `${RESERVE_RATE * 100}% von CHF ${withSmall}`, amount: Math.round(withSmall * RESERVE_RATE) });
   }
   return lines;
 }
