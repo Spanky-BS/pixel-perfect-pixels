@@ -1,4 +1,4 @@
-import { isQuotedLabour, labourItemType, LABOUR_ITEM_SECTION, type Labour, type Material } from "@/lib/app";
+import { isQuotedLabour, type Labour, type Material } from "@/lib/app";
 import { unitSalesPrice, type Product } from "@/lib/products";
 
 export function linkedProduct(row: { products?: Product | Product[] | null }): Product | null {
@@ -12,7 +12,7 @@ export function labourQuoteAmount(l: Pick<Labour, "hours" | "hourly_rate">) {
 }
 
 export function quotedLabour(list: Labour[] | null | undefined) {
-  return (list ?? []).filter((l) => isQuotedLabour(l) && labourItemType(l) === LABOUR_ITEM_SECTION);
+  return (list ?? []).filter(isQuotedLabour);
 }
 
 export function extraLabour(list: Labour[] | null | undefined) {

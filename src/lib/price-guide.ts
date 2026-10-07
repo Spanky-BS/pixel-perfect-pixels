@@ -45,38 +45,26 @@ const mid = (r: { low: number; high: number }) => (r.low + r.high) / 2;
 export type GuideMaterial = { description: string; quantity: number; category?: string | null | undefined };
 export type GuideLabour = { description: string; hours: number; hourly_rate: number };
 
-export type GuideLine = { label: string; amount: number };
-
-/** Same formula as estimateFromGuide, plus the lines behind each section total. */
-export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]) {
-  const amounts: Record<string, number> = {};
-  const details: Record<string, GuideLine[]> = {};
-  const add = (s: string, v: number, label: string) => {
-    amounts[s] = (amounts[s] ?? 0) + v;
-    (details[s] ??= []).push({ label, amount: Math.round(v) });
-  };
+/** Returns amount per estimate section, pre-filled from reference prices. */
+export function estimateFromGuide(materials: GuideMaterial[], labour: GuideLabour[]) {
+  const out: Record<string, number> = {};
+  const add = (s: string, v: number) => { out[s] = (out[s] ?? 0) + v; };
   let demolition = false;
   for (const m of materials) {
     const text = `${m.category ?? ""} ${m.description}`;
     if (/demont|rückbau|rueckbau|^alt|\balte[sr]?\b/i.test(m.description)) { demolition = true; continue; }
     const g = matchGuide(text);
     const qty = Number(m.quantity) > 0 ? Number(m.quantity) : 1;
-    add(g?.section ?? FALLBACK.section, mid(g ?? FALLBACK) * qty, `${qty}× ${m.description}`);
+    add(g?.section ?? FALLBACK.section, mid(g ?? FALLBACK) * qty);
   }
   for (const l of labour) {
-    const h = Number(l.hours) || 0;
-    if (h > 0) add("Arbeitsaufwand", h * Number(l.hourly_rate), `${l.description} (${h} Std. à ${l.hourly_rate})`);
+    add("Arbeitsaufwand", Number(l.hours) * Number(l.hourly_rate));
     if (/demont|rückbau|rueckbau|abbruch/i.test(l.description)) demolition = true;
   }
   if (demolition) {
-    add(FLAT.demontage.section, mid(FLAT.demontage), "Pauschale Demontage (Richtwert)");
-    add(FLAT.entsorgung.section, mid(FLAT.entsorgung), "Pauschale Entsorgung (Richtwert)");
+    add(FLAT.demontage.section, mid(FLAT.demontage));
+    add(FLAT.entsorgung.section, mid(FLAT.entsorgung));
   }
-  for (const k of Object.keys(amounts)) amounts[k] = Math.round(amounts[k] ?? 0);
-  return { amounts, details };
-}
-
-/** Returns amount per estimate section, pre-filled from reference prices. */
-export function estimateFromGuide(materials: GuideMaterial[], labour: GuideLabour[]) {
-  return breakdownFromGuide(materials, labour).amounts;
+  for (const k of Object.keys(out)) out[k] = Math.round(out[k] ?? 0);
+  return out;
 }

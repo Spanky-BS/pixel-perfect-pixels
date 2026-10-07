@@ -23,7 +23,6 @@ import {
   type Labour,
   type Material,
 } from "@/lib/app";
-import { childTasks } from "@/lib/labour-grouping";
 import { extraLabour, quotedLabour } from "@/lib/project-quote";
 
 export function useTimeEntries(jobId: string) {
@@ -92,18 +91,10 @@ export function AusfuehrungWorkspace({
         {quoted.map((l) => {
           const ist = istHours(l.id);
           const rows = entriesFor(l.id);
-          const kids = childTasks(labour.data, l.id);
           return (
             <article key={l.id} className="rounded-lg border border-border/80 bg-card px-3 py-3">
               <p className="font-semibold uppercase tracking-wide">{l.description || "–"}</p>
               {l.notes?.trim() && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
-              {kids.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {kids.map((t) => (
-                    <li key={t.id}>• {t.description || "–"}</li>
-                  ))}
-                </ul>
-              )}
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                 <div className="rounded-md bg-muted px-3 py-2">
                   <p className="text-xs text-muted-foreground">Offerte</p>

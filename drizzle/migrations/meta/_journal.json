@@ -85,27 +85,6 @@
       "when": 1791315038669,
       "tag": "0011_capture_analyzed_at",
       "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1791400000000,
-      "tag": "0012_labour_item_type",
-      "breakpoints": true
-    },
-    {
-      "idx": 13,
-      "version": "7",
-      "when": 1791500000000,
-      "tag": "0013_labour_work_key",
-      "breakpoints": true
-    },
-    {
-      "idx": 14,
-      "version": "7",
-      "when": 1791399000978,
-      "tag": "0014_estimate_item_details",
-      "breakpoints": true
     }
   ]
 }

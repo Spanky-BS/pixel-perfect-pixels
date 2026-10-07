@@ -90,7 +90,6 @@ export type Database = {
           amount: number
           created_at: string
           description: string
-          details: Json
           estimate_id: string
           id: string
           section: string
@@ -101,7 +100,6 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
-          details?: Json
           estimate_id: string
           id?: string
           section?: string
@@ -112,7 +110,6 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
-          details?: Json
           estimate_id?: string
           id?: string
           section?: string
@@ -415,15 +412,12 @@ export type Database = {
           hourly_rate: number
           hours: number
           id: string
-          item_type: string
           job_id: string
           notes: string | null
-          parent_id: string | null
           sort_order: number
           source: string
           updated_at: string
           user_id: string
-          work_key: string | null
         }
         Insert: {
           confidence?: string | null
@@ -432,15 +426,12 @@ export type Database = {
           hourly_rate?: number
           hours?: number
           id?: string
-          item_type?: string
           job_id: string
           notes?: string | null
-          parent_id?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
           user_id?: string
-          work_key?: string | null
         }
         Update: {
           confidence?: string | null
@@ -449,15 +440,12 @@ export type Database = {
           hourly_rate?: number
           hours?: number
           id?: string
-          item_type?: string
           job_id?: string
           notes?: string | null
-          parent_id?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
           user_id?: string
-          work_key?: string | null
         }
         Relationships: [
           {
@@ -465,13 +453,6 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "labour_items_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "labour_items"
             referencedColumns: ["id"]
           },
         ]

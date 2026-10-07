@@ -4,9 +4,6 @@ import { toast } from "sonner";
 import { assignLibraryProduct, matchesProduct, type Product, type ProductSearchHit } from "@/lib/products";
 import { categoriesQuery, productsQuery } from "@/lib/queries";
 import { formatCHF } from "@/lib/app";
-import { bucketForMaterials, productUseCount, productUseLabel } from "@/lib/company-experience";
-import { companyExperienceQuery } from "@/lib/company-experience-data";
-import { useMaterials } from "./MaterialList";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,18 +29,12 @@ export function ProductSearch({
   const qc = useQueryClient();
   const cats = useQuery(categoriesQuery());
   const products = useQuery(productsQuery());
-  const experience = useQuery(companyExperienceQuery(jobId));
-  const materials = useMaterials(jobId);
   const [q, setQ] = useState(hint ?? "");
   const [categoryId, setCategoryId] = useState("");
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [busy, setBusy] = useState(false);
 
   const catName = (id: string | null) => cats.data?.find((c) => c.id === id)?.name ?? "";
-  const bucket = bucketForMaterials("project", (materials.data ?? []).map((m) => ({
-    category: catName(m.category_id),
-    quantity: Number(m.quantity),
-  })));
   const hits: ProductSearchHit[] = useMemo(() => {
     const rows = products.data ?? [];
     const library = rows.filter((p) => {
@@ -123,9 +114,6 @@ export function ProductSearch({
                   EK {p.purchase_price != null ? formatCHF(Number(p.purchase_price)) : "–"} · VK{" "}
                   {p.sales_price != null ? formatCHF(Number(p.sales_price)) : p.markup != null ? `Zuschlag ${p.markup}%` : "–"}
                 </div>
-                {productUseLabel(productUseCount(experience.data?.productUses ?? [], p.id, bucket)) && (
-                  <div className="mt-1 text-xs text-muted-foreground">{productUseLabel(productUseCount(experience.data?.productUses ?? [], p.id, bucket))}</div>
-                )}
               </button>
               );
             })}

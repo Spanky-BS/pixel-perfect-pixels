@@ -21,7 +21,6 @@ import {
 } from "@/components/job/ServiceSections";
 import { Row } from "@/components/job/Kalkulation";
 import { ServiceReportAction } from "@/components/job/ServiceReport";
-import { SupplierInvoices } from "@/components/job/SupplierInvoices";
 import { address, customerName, displayServiceStatus, formatCHF, formatDate, servicePhotoCategory, signedUrls, uploadMedia, type Customer, type Job } from "@/lib/app";
 import { isTravelLabour, serviceBill } from "@/lib/service-billing";
 import { cancelJob } from "@/lib/lifecycle";
@@ -142,12 +141,7 @@ export function ServiceJobView({
           </section>
         </div>
       )}
-      {section === "abrechnung" && (
-        <div className="space-y-4">
-          <ServiceBilling job={job} />
-          <SupplierInvoices jobId={job.id} />
-        </div>
-      )}
+      {section === "abrechnung" && <ServiceBilling job={job} />}
       {section === "abschluss" && <ServiceClose job={job} />}
     </>
   );

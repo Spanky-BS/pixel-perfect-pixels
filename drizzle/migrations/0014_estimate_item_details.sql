@@ -1,1 +1,0 @@
-ALTER TABLE public.cost_estimate_items ADD COLUMN IF NOT EXISTS details jsonb NOT NULL DEFAULT '[]'::jsonb;

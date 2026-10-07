@@ -149,27 +149,7 @@ const LEGACY: Record<string, string> = {
   Auftrag: "Ausführung",
 };
 
-export const STANDARD_WORK_POSITIONS = ["Demontage", "Schmutzwasser", "Kalt- und Warmwasser", "Endmontage", "Unvorhergesehenes"] as const;
-/** Suggestion catalog for Offerte grouping. Not auto-seeded as empty rows. */
-export const WORK_GROUP_CATALOG = [
-  "Demontage / Wiedermontage",
-  "Kalt- und Warmwasser",
-  "Schmutzwasser",
-  "Abluft",
-  "Dämmungen",
-  "Spitz- und Bohrarbeiten",
-  "Bodenrinne / Spezielles",
-  "Wassererwärmer / Boiler",
-  "Endmontage",
-  "Unvorhergesehenes / Reserve",
-  "Entsorgung",
-] as const;
-export const LABOUR_ITEM_SECTION = "section";
-export const LABOUR_ITEM_TASK = "task";
-export type LabourItemType = typeof LABOUR_ITEM_SECTION | typeof LABOUR_ITEM_TASK;
-export function labourItemType(l: { item_type?: string | null }): LabourItemType {
-  return l.item_type === LABOUR_ITEM_TASK ? LABOUR_ITEM_TASK : LABOUR_ITEM_SECTION;
-}
+export const STANDARD_WORK_POSITIONS = ["Demontage", "Schmutzwasser", "Warm- und Kaltwasser", "Endmontage", "Unvorhergesehenes"] as const;
 export const EXECUTION_SOURCE = "execution";
 export function isQuotedLabour(l: { source?: string | null }) {
   return l.source !== EXECUTION_SOURCE;

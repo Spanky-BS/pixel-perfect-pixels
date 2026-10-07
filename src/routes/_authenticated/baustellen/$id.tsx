@@ -11,9 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/CustomerForm";
 import { DocumentList, NotesList, PhotoAssignSheet, PhotoGallery, SourceFilesSheet, classifyUpload, useCaptureSheets, useDocumentUpload, useFileInputs, usePhotoUpload } from "@/components/job/CaptureSection";
 import { MaterialEditor, MaterialList, useMaterials } from "@/components/job/MaterialList";
-import { LabourEditor, LabourList, useLabour, type LabourDraft } from "@/components/job/LabourList";
+import { LabourEditor, LabourList, useLabour } from "@/components/job/LabourList";
 import { settingsQuery } from "@/lib/queries";
-import { hourlyRateFromSettings, MISSING_RATE } from "@/lib/commercial";
 import { StatusStepper } from "@/components/job/StatusStepper";
 import { AiAnalysis, OpenQuestions } from "@/components/job/AiAnalysis";
 import { CostEstimate } from "@/components/job/CostEstimate";
@@ -23,7 +22,7 @@ import { SupplierInvoices } from "@/components/job/SupplierInvoices";
 import { ServiceJobView } from "@/components/job/ServiceJob";
 import { OfferteWorkspace, QuoteTotalsCard } from "@/components/job/Offerte";
 import { AusfuehrungWorkspace } from "@/components/job/Ausfuehrung";
-import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Material } from "@/lib/app";
+import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Labour, type Material } from "@/lib/app";
 import { computeQuote } from "@/lib/project-quote";
 import { StatusBadge } from "@/components/Brand";
 import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
@@ -47,12 +46,12 @@ function JobPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [selectedWorkflowStep, setSelectedWorkflowStep] = useState<string | null>(null);
-  const [mat, setMat] = useState<(Partial<Material> & { job_id: string; suggestionId?: string; aiQuantity?: number }) | null>(null);
+  const [mat, setMat] = useState<(Partial<Material> & { job_id: string }) | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [assignPhotoIds, setAssignPhotoIds] = useState<string[]>([]);
-  const [lab, setLab] = useState<LabourDraft | null>(null);
+  const [lab, setLab] = useState<(Partial<Labour> & { job_id: string }) | null>(null);
   const settings = useQuery(settingsQuery());
 
   const job = useQuery({
@@ -109,11 +108,7 @@ function JobPage() {
   const viewStep = selectedWorkflowStep ?? persisted;
 
   const addMaterial = () => { setMat({ job_id: id, quantity: 1, unit: "Stk", status: "Offen" }); };
-  const addLabour = () => {
-    const rate = hourlyRateFromSettings(settings.data);
-    if (rate == null) return toast.error(MISSING_RATE);
-    setLab({ job_id: id, hours: 1, hourly_rate: rate });
-  };
+  const addLabour = () => { setLab({ job_id: id, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) }); };
 
   const captureTiles = (
     <section className="space-y-4 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
@@ -353,8 +348,8 @@ function ProjectStepContent({
   captureTiles: React.ReactNode;
   onAddMaterial: () => void;
   onAddLabour: () => void;
-  onEditMaterial: (d: Partial<Material> & { job_id: string; suggestionId?: string; aiQuantity?: number }) => void;
-  onEditLabour: (d: LabourDraft) => void;
+  onEditMaterial: (d: Partial<Material> & { job_id: string }) => void;
+  onEditLabour: (d: Partial<Labour> & { job_id: string }) => void;
   onViewSources: () => void;
   onAddPhoto: () => void;
   onPhotoFiles: (files: FileList | File[] | null) => Promise<void> | void;

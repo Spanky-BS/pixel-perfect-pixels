@@ -56,13 +56,17 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
     else actualMaterial += r.net;
   });
 
+  const actualRevenue: number | null = null;
   const actualLabour = hasIstLabour ? istLabourCHF : null;
+  const vorlaeufigTotal = actualMaterial + (actualLabour ?? plannedLabour);
+  const vorlaeufigDeck = (actualRevenue ?? plannedVk) - vorlaeufigTotal;
+  const vorlaeufigMarge = (actualRevenue ?? plannedVk) > 0 ? Math.round((vorlaeufigDeck / (actualRevenue ?? plannedVk)) * 1000) / 10 : null;
 
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4">
       <h2 className="section-title">Vorläufige Nachkalkulation</h2>
       <p className="text-sm text-muted-foreground">
-        Offertwert aus der bestätigten Offerte. Ist-Stunden aus der Ausführung, bewertet zum Verkaufsansatz. Materialeinkauf aus bestätigten Lieferantenrechnungen. Interne Lohnkosten sind nicht hinterlegt. Die Kundenrechnung folgt.
+        SOLL aus der bestätigten Offerte. IST-Stunden aus der Ausführung. Ist-Material aus bestätigten Lieferantenrechnungen (netto). Kundenrechnung folgt ohne Bexio.
       </p>
       {materialIncomplete && (
         <p className="rounded-lg border border-warning bg-warning/15 p-3 text-sm font-semibold">
@@ -70,14 +74,14 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
         </p>
       )}
       <Row label="SOLL Arbeit" value={`${plannedHours.toLocaleString("de-CH")} h · ${formatCHF(plannedLabour)}`} />
-      <Row label="IST Arbeit (Verkaufsansatz)" value={actualLabour == null ? "noch keine IST-Stunden" : `${istHours.toLocaleString("de-CH")} h · ${formatCHF(actualLabour)}`} />
+      <Row label="IST Arbeit" value={actualLabour == null ? "noch keine IST-Stunden" : `${istHours.toLocaleString("de-CH")} h · ${formatCHF(actualLabour)}`} />
       <Row label="Geplanter Material-EK" value={formatCHF(plannedEk)} />
       <Row label="Geplanter Material-VK" value={formatCHF(plannedVk)} />
       <Row label="Ist-Material (netto)" value={materialIncomplete && !confirmed.length ? "–" : formatCHF(actualMaterial)} />
-      <Row label="Offertwert (Arbeit + Material-VK)" value={formatCHF(plannedLabour + plannedVk)} />
-      <Row label="Kundenrechnung" value="folgt (ohne Bexio)" />
-      <Row label="Nach Materialeinkauf" value={materialIncomplete ? "–" : formatCHF(plannedLabour + plannedVk - actualMaterial)} />
-      <p className="text-xs text-muted-foreground">Nach Materialeinkauf zieht nur den bestätigten Einkauf vom Offertwert ab. Arbeitsstunden bleiben daneben, weil kein interner Lohnkostensatz existiert.</p>
+      <Row label="Kundenerlös / Rechnung" value={actualRevenue == null ? "folgt (ohne Bexio)" : formatCHF(actualRevenue)} />
+      <Row label="Vorläufige Kosten (Ist-Material + Arbeit)" value={formatCHF(vorlaeufigTotal)} />
+      <Row label="Vorläufiger Deckungsbeitrag" value={formatCHF(vorlaeufigDeck)} />
+      <Row label="Vorläufige Marge" value={vorlaeufigMarge == null ? "–" : `${vorlaeufigMarge} %`} bold />
     </section>
   );
 }

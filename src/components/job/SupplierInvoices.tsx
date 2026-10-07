@@ -176,7 +176,7 @@ export function SupplierInvoices({ jobId }: { jobId: string }) {
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4">
       <h2 className="section-title">Lieferantenrechnungen</h2>
-      <p className="text-sm text-muted-foreground">Foto, Screenshot oder PDF. Die Rechnung ist der Einkauf für diesen Auftrag, nicht automatisch die verbrauchte Menge. Preise in der Bibliothek nur nach Prüfung übernehmen.</p>
+      <p className="text-sm text-muted-foreground">Foto, Screenshot oder PDF. Angaben immer prüfen, bevor Preise in die Bibliothek übernommen werden.</p>
       <div className="grid grid-cols-1 gap-2">
         <button type="button" disabled={busy} onClick={source.openChooser} className="action-tile-primary"><Camera className="h-6 w-6" />Rechnung fotografieren</button>
         <button type="button" disabled={busy} onClick={source.openChooser} className="flex h-12 items-center justify-center gap-2 rounded-lg border bg-card text-sm font-semibold">

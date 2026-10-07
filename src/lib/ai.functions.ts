@@ -6,19 +6,9 @@ import { classifyDoc, extractDocumentBytes } from "@/lib/ai/extract-document";
 import { nameOverlap } from "@/lib/invoice-match";
 import { unitSalesPrice } from "@/lib/products";
 import { mapExtraKind } from "@/lib/service-billing";
-import { WORK_GROUP_CATALOG } from "@/lib/app";
-import { normalizeAnalyseTask, sanitizeGroupingProposal, workKeyLabel } from "@/lib/labour-grouping";
-
-const WORK_RUBRICS = WORK_GROUP_CATALOG.join(", ");
 
 const SYSTEM = `Du bist ein erfahrener Sanitärinstallateur in der Schweiz (Haustechnik Nordwestschweiz).
 Du wertest eine Bestandesaufnahme (Fotos, Sprachnotizen, Textnotizen, Unterlagen) aus und erstellst strukturierte Anforderungen.
-Jede Arbeit ist ein einzelner Arbeitsschritt, noch keine Offertposition und keine ganze Rubrik.
-Ordne jede Arbeit genau einer Rubrik aus dieser Liste zu: ${WORK_RUBRICS}.
-Kalt- und Warmwasser ist eine gemeinsame Rubrik. Entsorgung ist eine eigene Rubrik, nicht Demontage und nicht Unvorhergesehenes.
-Wenn die Rubrik unklar ist, lasse rubrik leer. Erfinde keine Rubrik und setze Unklarheiten nicht auf Unvorhergesehenes.
-Stunden sind der geschätzte Aufwand dieses einen Schritts. Nenne Stunden nur, wenn die Aufnahme eine Dauer hergibt oder der Aufwand fachlich klar ist. Sonst lasse stunden weg.
-Keine Preise, keine CHF, keine Stundensätze, keine Marken, keine Verkaufspreise.
 WICHTIG: Erfinde KEINE fehlenden technischen Informationen (Dimensionen, Modelle, Anschlussarten, Farben, Marken).
 Wenn etwas unklar ist, lasse das Feld leer und erstelle stattdessen einen offenen Punkt, z.B.
 "genaue Dimension unklar", "Modell noch offen", "Anschlussart prüfen", "Farbe mit Kunde bestätigen", "vorhandene Leitung prüfen", "Ausführung vor Ort klären".
@@ -38,9 +28,8 @@ const tool = {
           items: {
             type: "object",
             properties: {
-              kategorie: { type: "string", description: "Einrichtungs-Kategorie wie WC, Dusche oder Armaturen. Keine Arbeit-Rubrik und keine Marke." },
-              beschreibung: { type: "string" }, menge: { type: "number" }, einheit: { type: "string" },
-              dimension: { type: "string" }, ausfuehrung: { type: "string" }, notiz: { type: "string" },
+              kategorie: { type: "string" }, beschreibung: { type: "string" }, menge: { type: "number" }, einheit: { type: "string" },
+              marke: { type: "string" }, dimension: { type: "string" }, ausfuehrung: { type: "string" }, notiz: { type: "string" },
               sicherheit: { type: "string", enum: ["niedrig", "mittel", "hoch"] },
             },
             required: ["beschreibung", "sicherheit"],
@@ -50,13 +39,7 @@ const tool = {
           type: "array",
           items: {
             type: "object",
-            properties: {
-              beschreibung: { type: "string" },
-              rubrik: { type: "string", description: `Genau ein Wert aus: ${WORK_RUBRICS}. Leer lassen wenn unklar.` },
-              stunden: { type: "number", description: "Stunden dieses einen Schritts. Weglassen wenn unbekannt." },
-              notiz: { type: "string" },
-              sicherheit: { type: "string", enum: ["niedrig", "mittel", "hoch"] },
-            },
+            properties: { beschreibung: { type: "string" }, stunden: { type: "number" }, notiz: { type: "string" }, sicherheit: { type: "string", enum: ["niedrig", "mittel", "hoch"] } },
             required: ["beschreibung", "sicherheit"],
           },
         },
@@ -66,55 +49,6 @@ const tool = {
     },
   },
 };
-
-function asHours(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && value.trim()) {
-    const n = Number(value.replace(",", "."));
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-function labourSuggestion(raw: Record<string, unknown>) {
-  const description = raw["beschreibung"];
-  const rubric = raw["rubrik"];
-  const note = raw["notiz"];
-  const confidence = raw["sicherheit"];
-  const task = normalizeAnalyseTask({
-    description: typeof description === "string" ? description : "",
-    category: typeof rubric === "string" ? rubric : null,
-    hours: asHours(raw["stunden"]),
-  });
-  return {
-    beschreibung: task.description,
-    rubrik: task.workKey ? workKeyLabel(task.workKey) : "",
-    arbeit_key: task.workKey,
-    stunden: task.hours,
-    notiz: typeof note === "string" ? note : "",
-    sicherheit: typeof confidence === "string" ? confidence : "mittel",
-  };
-}
-
-function materialSuggestion(raw: Record<string, unknown>) {
-  const category = raw["kategorie"];
-  const description = raw["beschreibung"];
-  const unit = raw["einheit"];
-  const dimension = raw["dimension"];
-  const finish = raw["ausfuehrung"];
-  const note = raw["notiz"];
-  const confidence = raw["sicherheit"];
-  return {
-    kategorie: typeof category === "string" ? category : "",
-    beschreibung: typeof description === "string" ? description.trim() : "",
-    menge: asHours(raw["menge"]),
-    einheit: typeof unit === "string" && unit.trim() ? unit.trim() : "Stk",
-    dimension: typeof dimension === "string" ? dimension : "",
-    ausfuehrung: typeof finish === "string" ? finish : "",
-    notiz: typeof note === "string" ? note : "",
-    sicherheit: typeof confidence === "string" ? confidence : "mittel",
-  };
-}
 
 export const analyzeJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -129,7 +63,7 @@ export const analyzeJob = createServerFn({ method: "POST" })
       sb.from("material_categories").select("name").order("sort_order"),
       sb.from("job_documents").select("id, storage_path, file_name, file_type, mime_type, analyzed_at").eq("job_id", data.jobId).order("created_at"),
       sb.from("material_requirements").select("description, quantity, unit").eq("job_id", data.jobId),
-      sb.from("labour_items").select("description, hours, work_key, source").eq("job_id", data.jobId),
+      sb.from("labour_items").select("description, hours").eq("job_id", data.jobId),
       sb.from("open_questions").select("text").eq("job_id", data.jobId),
     ]);
     if (!job) throw new Error("Auftrag nicht gefunden");
@@ -167,10 +101,9 @@ export const analyzeJob = createServerFn({ method: "POST" })
       else skippedDocuments.push(`${doc.file_name} (${extracted.reason})`);
     }
 
-    const confirmedLabour = (labs ?? []).filter((l) => l.source !== "execution");
     const known = [
-      ...confirmedLabour.map((l) => `Arbeit: ${l.description} | ${l.work_key ?? "unzugeordnet"} | ${l.hours} h`),
-      ...(mats ?? []).map((m) => `Material: ${m.description} | ${m.quantity} ${m.unit}`),
+      ...(mats ?? []).map((m) => `Material: ${m.description} (${m.quantity} ${m.unit})`),
+      ...(labs ?? []).map((l) => `Arbeit: ${l.description} (${l.hours} h)`),
       ...(opens ?? []).map((o) => `Offener Punkt: ${o.text}`),
     ];
     const text = [
@@ -179,8 +112,8 @@ export const analyzeJob = createServerFn({ method: "POST" })
       !followUp && job.problem_description && `Problem: ${job.problem_description}`,
       !followUp && job.customer_request && `Kundenwunsch: ${job.customer_request}`,
       `Verfügbare Materialkategorien: ${(cats ?? []).map((c) => c.name).join(", ")}`,
-      known.length
-        ? `${followUp ? "NACHTRAG: Werte nur die neuen Aufnahmen aus. Ältere Notizen, Fotos und Unterlagen stehen hier nicht. " : ""}Bereits bestätigt, nicht wiederholen und nicht ändern:\n${known.join("\n")}`
+      followUp && known.length
+        ? `NACHTRAG: Die folgenden Positionen sind bereits erfasst. Wiederhole sie NICHT, erfasse nur Neues aus den neuen Aufnahmen:\n${known.join("\n")}`
         : null,
       ...notes.map((n) => `${followUp ? "Neue " : ""}${n.kind === "voice" ? "Sprachnotiz" : "Textnotiz"}: ${n.transcript}`),
       ...photos.filter((p) => p.description || p.category).map((p, i) => `Foto ${i + 1}: ${[p.category, p.description].filter(Boolean).join(" – ")}`),
@@ -212,22 +145,12 @@ export const analyzeJob = createServerFn({ method: "POST" })
       if (!open.includes(msg)) open.push(msg);
     });
 
-    const labourNames = new Set(confirmedLabour.map((l) => l.description.trim().toLowerCase()));
-    const materialNames = new Set((mats ?? []).map((m) => m.description.trim().toLowerCase()));
-    const openNames = new Set((opens ?? []).map((o) => o.text.trim().toLowerCase()));
-    const labourPayloads = (out.arbeit ?? []).map(labourSuggestion).filter((m) => m.beschreibung && !labourNames.has(m.beschreibung.toLowerCase()));
-    const materialPayloads = (out.material ?? []).map(materialSuggestion).filter((m) => {
-      const name = String(m.beschreibung ?? "").trim().toLowerCase();
-      return name && !materialNames.has(name);
-    });
-    const openPayloads = open.filter((t) => t.trim() && !openNames.has(t.trim().toLowerCase()));
-
     // First analysis replaces stale pending suggestions; a follow-up only adds new ones.
     if (!followUp) await sb.from("ai_suggestions").delete().eq("job_id", data.jobId).eq("state", "pending");
     const rows = [
-      ...materialPayloads.map((m) => ({ job_id: data.jobId, kind: "material", payload: m as never, confidence: String(m.sicherheit ?? "mittel") })),
-      ...labourPayloads.map((m) => ({ job_id: data.jobId, kind: "labour", payload: m as never, confidence: String(m.sicherheit ?? "mittel") })),
-      ...openPayloads.map((t) => ({ job_id: data.jobId, kind: "open", payload: { text: t } as never, confidence: null })),
+      ...(out.material ?? []).map((m) => ({ job_id: data.jobId, kind: "material", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
+      ...(out.arbeit ?? []).map((m) => ({ job_id: data.jobId, kind: "labour", payload: m as never, confidence: String(m["sicherheit"] ?? "mittel") })),
+      ...open.map((t) => ({ job_id: data.jobId, kind: "open", payload: { text: t } as never, confidence: null })),
     ];
     if (rows.length) {
       const { error } = await sb.from("ai_suggestions").insert(rows);
@@ -488,14 +411,14 @@ export const extractProjectExecution = createServerFn({ method: "POST" })
     const [{ data: job }, { data: notes }, { data: labourRows }, { data: matRows }, { data: photos }] = await Promise.all([
       sb.from("jobs").select("title").eq("id", data.jobId).maybeSingle(),
       sb.from("voice_notes").select("kind, transcript").eq("job_id", data.jobId).order("created_at"),
-      sb.from("labour_items").select("id, description, hours, source, item_type").eq("job_id", data.jobId).order("sort_order"),
+      sb.from("labour_items").select("id, description, hours, source").eq("job_id", data.jobId).order("sort_order"),
       sb.from("material_requirements").select("id, description, quantity, unit").eq("job_id", data.jobId).order("sort_order"),
       data.usePhotos
         ? sb.from("job_photos").select("storage_path").eq("job_id", data.jobId).order("taken_at", { ascending: false }).limit(4)
         : Promise.resolve({ data: [] as { storage_path: string }[] }),
     ]);
     if (!job) throw new Error("Auftrag nicht gefunden");
-    const quoted = (labourRows ?? []).filter((l) => l.source !== "execution" && (l.item_type ?? "section") === "section");
+    const quoted = (labourRows ?? []).filter((l) => l.source !== "execution");
     const positions = quoted.map((l) => `- ${l.description} (Offerte ${Number(l.hours)} h)`).join("\n") || "(keine Offertpositionen)";
     const mats = (matRows ?? []).map((m) => `- ${m.description} (${Number(m.quantity)} ${m.unit})`).join("\n") || "(kein Offertmaterial)";
 
@@ -565,92 +488,4 @@ export const extractProjectExecution = createServerFn({ method: "POST" })
       });
 
     return { labour, material };
-  });
-
-const GROUP_SYSTEM = `Du gliederst bereits erfasste Sanitär-Arbeitsaufgaben in wenige professionelle Offertpositionen (Leistungspositionen).
-Du erfindest KEINE neuen Aufgaben und KEINE Stunden. Jede ungruppierte Aufgabe kommt in genau eine Position.
-Standard für Wasserleitungen: eine Position «Kalt- und Warmwasser». Kaltwasser und Warmwasser nicht trennen, ausser das Projekt braucht eindeutig getrennte Leistungspositionen – dann darfst du abweichende Titel vorschlagen.
-Texte knapp, professionell, auf Deutsch (Schweiz, ohne ß), im Stil «Ausgeführt wie folgt: …».
-Bereits zugeordnete Aufgaben nicht verschieben.`;
-
-const groupTool = {
-  type: "function" as const,
-  function: {
-    name: "offerte_abschnitte",
-    description: "Zuordnung bestehender Aufgaben zu Offertpositionen",
-    parameters: {
-      type: "object",
-      properties: {
-        abschnitte: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              titel: { type: "string" },
-              text: { type: "string" },
-              aufgaben_ids: { type: "array", items: { type: "string" } },
-            },
-            required: ["titel", "aufgaben_ids"],
-          },
-        },
-      },
-      required: ["abschnitte"],
-    },
-  },
-};
-
-export type LabourGroupProposal = {
-  sections: Array<{ title: string; notes: string; taskIds: string[] }>;
-};
-
-export const groupLabourForQuote = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ jobId: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }): Promise<LabourGroupProposal> => {
-    const sb = context.supabase;
-    const [{ data: job }, { data: rows }] = await Promise.all([
-      sb.from("jobs").select("title, notes, customer_request").eq("id", data.jobId).maybeSingle(),
-      sb.from("labour_items").select("id, description, hours, notes, item_type, parent_id, source").eq("job_id", data.jobId).order("sort_order").order("created_at"),
-    ]);
-    if (!job) throw new Error("Auftrag nicht gefunden");
-    const labour = rows ?? [];
-    const ungrouped = labour.filter((l) => (l.item_type ?? "section") === "task" && !l.parent_id && l.source !== "execution");
-    if (!ungrouped.length) return { sections: [] };
-
-    const sections = labour.filter((l) => (l.item_type ?? "section") === "section" && l.source !== "execution");
-    const grouped = labour.filter((l) => (l.item_type ?? "section") === "task" && l.parent_id);
-    const text = [
-      `Projekt: ${job.title}`,
-      job.customer_request && `Kundenwunsch: ${job.customer_request}`,
-      job.notes && `Notizen: ${job.notes}`,
-      `Katalog (bevorzugen, leere Positionen nicht anlegen):\n${WORK_GROUP_CATALOG.map((t) => `- ${t}`).join("\n")}`,
-      `Bestehende Offertpositionen:\n${sections.map((s) => `- ${s.description}`).join("\n") || "(noch keine)"}`,
-      `Bereits zugeordnet (nicht ändern):\n${grouped.map((t) => {
-        const parent = sections.find((s) => s.id === t.parent_id);
-        return `- ${t.id} | ${t.description} → ${parent?.description ?? t.parent_id}`;
-      }).join("\n") || "(keine)"}`,
-      `Ungruppierte Aufgaben (nur diese IDs zuweisen):\n${ungrouped.map((t) => `- ${t.id} | ${t.description} | ${Number(t.hours)} h${t.notes ? ` | ${t.notes}` : ""}`).join("\n")}`,
-      "Typische Zuordnung: Bodenrinne → Schmutzwasser, LIMODOR / Abluftventilator → Abluft, Kernbohrung / Spitzarbeiten → Spitz- und Bohrarbeiten, Kalt- und Warmwasserleitungen gemeinsam → Kalt- und Warmwasser.",
-    ].filter(Boolean).join("\n");
-
-    const { toolArguments } = await completeChat({
-      system: GROUP_SYSTEM,
-      userContent: [{ type: "text", text }],
-      tools: [groupTool],
-      toolName: "offerte_abschnitte",
-    });
-    if (!toolArguments) throw new Error("Keine Gliederung erhalten");
-    const out = JSON.parse(toolArguments) as {
-      abschnitte?: Array<{ titel?: string; text?: string; aufgaben_ids?: string[] }>;
-    };
-    return {
-      sections: sanitizeGroupingProposal(
-        (out.abschnitte ?? []).map((a) => ({
-          title: String(a.titel ?? "").trim(),
-          notes: String(a.text ?? "").trim(),
-          taskIds: (a.aufgaben_ids ?? []).map(String),
-        })),
-        ungrouped,
-      ),
-    };
   });
