@@ -29,7 +29,6 @@ export const FALLBACK = { section: "Installationsmaterial", low: 50, high: 150 }
 /** Flat Richtwerte per job when the respective work is mentioned. */
 export const FLAT = {
   demontage: { section: "Demontage", low: 600, high: 1100 },
-  entsorgung: { section: "Entsorgung", low: 250, high: 450 },
 };
 
 export function matchGuide(text: string): PriceGuideEntry | null {
@@ -48,12 +47,31 @@ export type GuideLabour = { description: string; hours: number; hourly_rate: num
 export type GuideLine = { section: string; label: string; detail: string; amount: number };
 
 /** Every material/labour line with the section and amount it contributes to the estimate. */
+const DEMO_RE = /demont|rückbau|rueckbau|abbruch|entleer|verzapf/i;
+const DISPOSAL_RE = /entsorg|abtransport|mulde/i;
+/** Disposal per demolished part, with a minimum. */
+export const DISPOSAL = { perPart: 40, min: 150 };
+
+/** "Demontage 2 x WC" -> 2; falls back to 1. */
+export function partsIn(text: string): number {
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*(?:x|×|stk|stück)\b/i);
+  return m ? Math.max(1, Math.round(Number(m[1]!.replace(",", ".")))) : 1;
+}
+
+/** Every material/labour line with the section and amount it contributes to the estimate. */
 export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]): GuideLine[] {
   const lines: GuideLine[] = [];
-  let demolition = false;
+  let demolitionMentioned = false;
+  let demolitionHours = 0;
+  let parts = 0;
+  let disposalLabour = false;
   for (const m of materials) {
     const text = `${m.category ?? ""} ${m.description}`;
-    if (/demont|rückbau|rueckbau|^alt|\balte[sr]?\b/i.test(m.description)) { demolition = true; continue; }
+    if (/demont|rückbau|rueckbau|^alt|\balte[sr]?\b/i.test(m.description)) {
+      demolitionMentioned = true;
+      parts += Number(m.quantity) > 0 ? Number(m.quantity) : 1;
+      continue;
+    }
     const g = matchGuide(text);
     const qty = Number(m.quantity) > 0 ? Number(m.quantity) : 1;
     const unit = mid(g ?? FALLBACK);
@@ -65,12 +83,24 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
     });
   }
   for (const l of labour) {
-    lines.push({ section: "Arbeitsaufwand", label: l.description, detail: `${Number(l.hours)} h × ${Number(l.hourly_rate)} CHF`, amount: Math.round(Number(l.hours) * Number(l.hourly_rate)) });
-    if (/demont|rückbau|rueckbau|abbruch/i.test(l.description)) demolition = true;
+    const hours = Number(l.hours);
+    const disposal = DISPOSAL_RE.test(l.description);
+    const demo = !disposal && DEMO_RE.test(l.description);
+    const section = disposal ? "Entsorgung" : demo ? "Demontage" : "Arbeitsaufwand";
+    lines.push({ section, label: l.description, detail: `${hours} h × ${Number(l.hourly_rate)} CHF`, amount: Math.round(hours * Number(l.hourly_rate)) });
+    if (disposal) disposalLabour = true;
+    if (demo) {
+      demolitionMentioned = true;
+      if (hours > 0) demolitionHours += hours;
+      if (/demont|rückbau|rueckbau|abbruch/i.test(l.description)) parts += partsIn(l.description);
+    }
   }
-  if (demolition) {
-    lines.push({ section: FLAT.demontage.section, label: "Demontage bestehender Apparate", detail: "Pauschale", amount: mid(FLAT.demontage) });
-    lines.push({ section: FLAT.entsorgung.section, label: "Entsorgung", detail: "Pauschale", amount: mid(FLAT.entsorgung) });
+  if (demolitionMentioned && demolitionHours === 0) {
+    lines.push({ section: FLAT.demontage.section, label: "Demontage bestehender Apparate", detail: "Pauschale (keine Demontage-Stunden erfasst)", amount: mid(FLAT.demontage) });
+  }
+  if (demolitionMentioned && !disposalLabour) {
+    const n = Math.max(1, parts);
+    lines.push({ section: "Entsorgung", label: "Entsorgung demontierter Teile", detail: `${n} Teile × ${DISPOSAL.perPart} CHF (mind. ${DISPOSAL.min} CHF)`, amount: Math.max(DISPOSAL.min, n * DISPOSAL.perPart) });
   }
   return lines;
 }
