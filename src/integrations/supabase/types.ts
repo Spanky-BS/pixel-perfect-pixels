@@ -90,6 +90,7 @@ export type Database = {
           amount: number
           created_at: string
           description: string
+          details: Json
           estimate_id: string
           id: string
           section: string
@@ -100,6 +101,7 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
+          details?: Json
           estimate_id: string
           id?: string
           section?: string
@@ -110,6 +112,7 @@ export type Database = {
           amount?: number
           created_at?: string
           description?: string
+          details?: Json
           estimate_id?: string
           id?: string
           section?: string
