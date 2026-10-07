@@ -71,6 +71,15 @@ export function partsIn(text: string): number {
 const q4 = (h: number) => Math.round(h * 4) / 4;
 
 /** Every material/labour line with the section and amount it contributes to the estimate. */
+/** "Demontage und Remontage von 1 Pissoir" -> "1 Pissoir" */
+export function splitObject(description: string): string {
+  const von = description.match(/\bvon\s+(.+)$/i);
+  if (von?.[1]) return von[1].trim();
+  return description
+    .replace(/\b(demontage|rückbau|rueckbau|remontage|wiedermontage|montage|wiederanschluss|anschluss|befüllung|und|sowie)\b/gi, "")
+    .replace(/[,]+/g, " ").replace(/\s+/g, " ").trim() || description;
+}
+
 export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabour[]): GuideLine[] {
   const lines: GuideLine[] = [];
   let demolitionMentioned = false;
@@ -93,7 +102,12 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
       amount: Math.round(unit * qty),
     });
   }
+  const seen = new Set<string>();
   for (const l of labour) {
+    // Same work listed twice (e.g. repeated AI runs) is only counted once.
+    const key = l.description.toLowerCase().replace(/[^a-z0-9äöü]+/g, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
     const hours = Number(l.hours) || 0;
     const rate = Number(l.hourly_rate);
     totalHours += hours;
@@ -106,8 +120,9 @@ export function breakdownFromGuide(materials: GuideMaterial[], labour: GuideLabo
       const dh = q4(hours * DEMO_SHARE);
       const mh = hours - dh;
       demolitionHours += dh;
-      lines.push({ section: "Demontage", label: `Demontage: ${l.description}`, detail: `${dh} h × ${rate} CHF (Anteil Demontage)`, amount: Math.round(dh * rate) });
-      lines.push({ section: "Arbeitsaufwand", label: `Montage: ${l.description}`, detail: `${mh} h × ${rate} CHF (Anteil Montage)`, amount: Math.round(mh * rate) });
+      const obj = splitObject(l.description);
+      lines.push({ section: "Demontage", label: `Demontage ${obj}`, detail: `${dh} h × ${rate} CHF (Anteil Demontage von ${hours} h)`, amount: Math.round(dh * rate) });
+      lines.push({ section: "Arbeitsaufwand", label: `Montage ${obj}`, detail: `${mh} h × ${rate} CHF (Anteil Montage von ${hours} h)`, amount: Math.round(mh * rate) });
       continue;
     }
     const section = demo ? "Demontage" : "Arbeitsaufwand";

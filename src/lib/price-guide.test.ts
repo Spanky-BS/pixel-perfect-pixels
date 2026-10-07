@@ -58,3 +58,13 @@ describe("grobkosten workflow", () => {
     expect(ns("project", "Analyse")).toBe("Grobkosten");
   });
 });
+
+import { breakdownFromGuide as bfg } from "./price-guide";
+describe("Demontage und Remontage split", () => {
+  it("labels split lines cleanly and counts duplicates once", () => {
+    const l = { description: "Demontage und Remontage von 1 Pissoir", hours: 2.75, hourly_rate: 130 };
+    const lines = bfg([], [l, { ...l }]);
+    expect(lines.filter((x) => x.label === "Demontage 1 Pissoir")).toHaveLength(1);
+    expect(lines.filter((x) => x.label === "Montage 1 Pissoir")).toHaveLength(1);
+  });
+});

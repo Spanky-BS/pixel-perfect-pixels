@@ -15,6 +15,15 @@ const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v
 /** Prefix of the text note that stores an answer to an open question (picked up by the next AI run). */
 export const answerPrefix = (question: string) => `Antwort zu «${question}»: `;
 
+/** Removes everything the AI created for this job (manual items and clarified questions stay). */
+export async function clearAiItems(jobId: string) {
+  await Promise.all([
+    supabase.from("labour_items").delete().eq("job_id", jobId).eq("source", "ai"),
+    supabase.from("material_requirements").delete().eq("job_id", jobId).eq("source", "ai"),
+    supabase.from("open_questions").delete().eq("job_id", jobId).eq("source", "ai").neq("status", "geklärt"),
+  ]);
+}
+
 /**
  * Runs the AI on all not-yet-analysed captures and applies the result directly:
  * material + labour go into the job, unclear points become open questions.
@@ -32,8 +41,10 @@ export function useAnalyzeAndApply(jobId: string) {
     try {
       const r = await run({ data: { jobId } });
       if (r.nothingNew) {
-        toast.message("Keine neuen Aufnahmen oder Antworten – nichts Neues auszuwerten.");
-        return false;
+        await clearAiItems(jobId);
+        ["materials", "labour", "open", "ai"].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
+        toast.message("Begehung ist leer – KI-Positionen und offene Fragen entfernt.");
+        return true;
       }
       const { data: rows } = await supabase.from("ai_suggestions").select("*").eq("job_id", jobId).eq("state", "pending");
       const catId = (name: unknown) => cats.data?.find((c) => c.name.toLowerCase() === String(name ?? "").toLowerCase())?.id ?? null;
@@ -51,7 +62,12 @@ export function useAnalyzeAndApply(jobId: string) {
         const note = [s(p["notiz"]), h ? null : "Stunden geschätzt – prüfen"].filter(Boolean).join(" · ") || null;
         return { job_id: jobId, description: s(p["beschreibung"]) ?? "", hours: h ?? 1, hourly_rate: rate, notes: note, source: "ai", sort_order: (Date.now() % 1e9) + i };
       }).filter((l) => l.description);
-      const opens = (rows ?? []).filter((x) => x.kind === "open").map((x) => ({ job_id: jobId, text: String(((x.payload ?? {}) as P)["text"] ?? ""), source: "ai" })).filter((o) => o.text);
+      // Replace (not append) the previous AI result; clarified questions stay.
+      await clearAiItems(jobId);
+      const { data: kept } = await supabase.from("open_questions").select("text").eq("job_id", jobId);
+      const keptTexts = new Set((kept ?? []).map((o) => o.text.toLowerCase()));
+      const opens = (rows ?? []).filter((x) => x.kind === "open").map((x) => ({ job_id: jobId, text: String(((x.payload ?? {}) as P)["text"] ?? ""), source: "ai" }))
+        .filter((o) => o.text && !keptTexts.has(o.text.toLowerCase()));
       const results = await Promise.all([
         mats.length ? supabase.from("material_requirements").insert(mats) : null,
         labs.length ? supabase.from("labour_items").insert(labs) : null,

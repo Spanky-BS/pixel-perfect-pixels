@@ -72,13 +72,14 @@ export const analyzeJob = createServerFn({ method: "POST" })
     ]);
     if (!job) throw new Error("Auftrag nicht gefunden");
 
-    // Only analyse captures that were not part of a previous analysis.
-    const notes = (allNotes ?? []).filter((n) => !n.analyzed_at && n.transcript);
-    const photos = (allPhotos ?? []).filter((p) => !p.analyzed_at).slice(0, 8);
-    const docs = (allDocs ?? []).filter((d) => !d.analyzed_at);
-    const followUp = [...(allNotes ?? []), ...(allPhotos ?? []), ...(allDocs ?? [])].some((x) => x.analyzed_at);
+    // Every run evaluates the whole Begehung; the client replaces previous AI items, so nothing is counted twice.
+    const notes = (allNotes ?? []).filter((n) => n.transcript);
+    const photos = (allPhotos ?? []).slice(0, 8);
+    const docs = allDocs ?? [];
+    const followUp = false;
+    void mats; void labs; void opens;
     if (!notes.length && !photos.length && !docs.length) {
-      if (followUp) return { count: 0, skippedDocuments: [] as string[], nothingNew: true };
+      return { count: 0, skippedDocuments: [] as string[], nothingNew: true };
     }
 
     const skippedDocuments: string[] = [];
