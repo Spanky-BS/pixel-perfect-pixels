@@ -29,14 +29,14 @@ describe("price guide", () => {
     expect(r["Demontage"]).toBe(100);
     expect(r["Arbeitsaufwand"]).toBe(150);
   });
-  it("Fahrzeugpauschale 75 per started 8 h", () => {
-    expect(estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(75);
-    expect(estimateFromGuide([], [{ description: "Montage", hours: 9, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(150);
+  it("Fahrzeugpauschale 50 per started 8 h", () => {
+    expect(estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(50);
+    expect(estimateFromGuide([], [{ description: "Montage", hours: 9, hourly_rate: 100 }])["Fahrzeugpauschale"]).toBe(100);
   });
-  it("Kleinmaterial 20% of total, Reserve 10% of total incl. Kleinmaterial", () => {
+  it("Kleinmaterial 5% of total, Reserve 10% of total incl. Kleinmaterial", () => {
     const r = estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 115.625 }]);
-    expect(r["Kleinmaterial"]).toBe(200);
-    expect(r["Reserve / Unvorhergesehenes"]).toBe(120);
+    expect(r["Kleinmaterial"]).toBe(49);
+    expect(r["Reserve / Unvorhergesehenes"]).toBe(102);
   });
   it("flat Demontage 850 only without demolition hours", () => {
     expect(estimateFromGuide([{ description: "Demontage altes Lavabo", quantity: 1 }], [])["Demontage"]).toBe(850);

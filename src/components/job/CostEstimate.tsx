@@ -19,6 +19,7 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
   const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
   const ai = useAnalyzeAndApply(jobId);
+  const rates = { vehiclePerDay: Number(settings.data?.estimate_vehicle_per_day ?? 50), smallMaterialPct: Number(settings.data?.estimate_small_material_pct ?? 5) };
   const est = useQuery({
     queryKey: ["estimates", jobId],
     queryFn: async () => {
@@ -28,8 +29,9 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
     },
   });
   const lines = useQuery({
-    queryKey: ["estimate-lines", jobId],
-    queryFn: () => guideInput(jobId).then(([m, l]) => breakdownFromGuide(m, l)),
+    queryKey: ["estimate-lines", jobId, rates.vehiclePerDay, rates.smallMaterialPct],
+    queryFn: () => guideInput(jobId).then(([m, l]) => breakdownFromGuide(m, l, rates)),
+    enabled: !!settings.data,
   });
   const cur = est.data?.[0];
   const refresh = () => {
@@ -39,7 +41,7 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
 
   async function writeEstimate() {
     const [m, l] = await guideInput(jobId);
-    const amounts = estimateFromGuide(m, l);
+    const amounts = estimateFromGuide(m, l, rates);
     const note = `Berechnet am ${new Date().toLocaleString("de-CH")} aus Begehung (Schweizer Richtwerte)`;
     if (!cur) {
       const { data, error } = await supabase.from("cost_estimates")
@@ -73,7 +75,7 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
     setUpdating(true);
     try {
       if (!(await hasCaptures(jobId))) {
-        await clearAiItems(jobId);
+        await clearAiItems(jobId, true);
         ["materials", "labour", "open"].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
       }
       await writeEstimate(); toast.success("Grobkosten aktualisiert");
