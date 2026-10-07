@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
 import { ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, roundTo } from "@/lib/app";
 import { breakdownFromGuide, estimateFromGuide, type GuideLine, type GuideMaterial, type GuideLabour } from "@/lib/price-guide";
-import { useAnalyzeAndApply } from "@/components/job/AiAnalysis";
+import { clearAiItems, useAnalyzeAndApply } from "@/components/job/AiAnalysis";
+
+async function hasCaptures(jobId: string) {
+  const r = await Promise.all(["voice_notes", "job_photos", "job_documents"].map((t) =>
+    supabase.from(t as "voice_notes").select("id", { count: "exact", head: true }).eq("job_id", jobId)));
+  return r.some((x) => (x.count ?? 0) > 0);
+}
 
 export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: string; onWantsOffer: () => void; onDeclined: () => void }) {
   const qc = useQueryClient();
@@ -65,7 +71,13 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
   const [custom, setCustom] = useState("");
   async function update() {
     setUpdating(true);
-    try { await writeEstimate(); toast.success("Grobkosten aktualisiert"); } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); } finally { setUpdating(false); }
+    try {
+      if (!(await hasCaptures(jobId))) {
+        await clearAiItems(jobId);
+        ["materials", "labour", "open"].forEach((k) => qc.invalidateQueries({ queryKey: [k, jobId] }));
+      }
+      await writeEstimate(); toast.success("Grobkosten aktualisiert");
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); } finally { setUpdating(false); }
   }
 
   const aiButton = (

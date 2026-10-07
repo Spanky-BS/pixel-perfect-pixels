@@ -15,6 +15,15 @@ const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v
 /** Prefix of the text note that stores an answer to an open question (picked up by the next AI run). */
 export const answerPrefix = (question: string) => `Antwort zu «${question}»: `;
 
+/** Removes everything the AI created for this job (manual items and clarified questions stay). */
+export async function clearAiItems(jobId: string) {
+  await Promise.all([
+    supabase.from("labour_items").delete().eq("job_id", jobId).eq("source", "ai"),
+    supabase.from("material_requirements").delete().eq("job_id", jobId).eq("source", "ai"),
+    supabase.from("open_questions").delete().eq("job_id", jobId).eq("source", "ai").neq("status", "geklärt"),
+  ]);
+}
+
 /**
  * Runs the AI on all not-yet-analysed captures and applies the result directly:
  * material + labour go into the job, unclear points become open questions.
