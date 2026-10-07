@@ -5,11 +5,10 @@ import { Copy, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { settingsQuery } from "@/lib/queries";
-import { CONFIDENCE, ESTIMATE_DISCLAIMER, ESTIMATE_SECTIONS, formatCHF, formatDate, roundTo } from "@/lib/app";
-import { hourlyRateFromSettings, MISSING_RATE, settingNumber } from "@/lib/commercial";
+import { CONFIDENCE, ESTIMATE_DISCLAIMER, formatCHF, formatDate, roundTo } from "@/lib/app";
 import { companyExperienceQuery } from "@/lib/company-experience-data";
-import { bucketForMaterials, estimateWithExperience } from "@/lib/company-experience";
-import { estimateFromGuide } from "@/lib/price-guide";
+import { buildEstimate, saveEstimate } from "@/lib/estimate-build";
+import type { GuideLine } from "@/lib/price-guide";
 
 export function CostEstimate({ jobId }: { jobId: string }) {
   const qc = useQueryClient();
@@ -28,52 +27,21 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const cur = list.find((e) => e.id === sel) ?? list[0];
   const refresh = () => qc.invalidateQueries({ queryKey: ["estimates", jobId] });
 
-  async function guideAmounts() {
-    const rate = hourlyRateFromSettings(settings.data);
-    const tolerance = settingNumber(settings.data?.estimate_tolerance);
-    if (rate == null || tolerance == null) {
-      toast.error(rate == null ? MISSING_RATE : "Grobkosten-Toleranz fehlt in den Einstellungen.");
-      return null;
-    }
-    const [{ data: lab }, { data: mat }] = await Promise.all([
-      supabase.from("labour_items").select("description, hours, hourly_rate, source, item_type, parent_id").eq("job_id", jobId),
-      supabase.from("material_requirements").select("description, quantity, material_categories(name)").eq("job_id", jobId),
-    ]);
-    const materials = (mat ?? []).map((m) => ({
-      description: m.description,
-      quantity: Number(m.quantity),
-      category: (m.material_categories as { name: string } | null)?.name ?? null,
-    }));
-    const labour = (lab ?? []).filter((l) => l.source !== "execution" && (l.item_type === "task" ? !l.parent_id : true)).map((l) => ({
-      description: l.description,
-      hours: Number(l.hours),
-      hourly_rate: rate,
-    }));
-    const guide = estimateFromGuide(materials, labour);
-    const priced = estimateWithExperience({
-      guide,
-      labour,
-      currentRate: rate,
-      bucket: bucketForMaterials("project", materials),
-      observations: experience.data?.observations ?? [],
-    });
-    const notes = priced.explanations.length
-      ? priced.explanations.join(" ")
-      : "Vorbefüllt mit Schweizer Richtwerten (Sanitas Troesch / Richner / Pestalozzi)";
-    return { amounts: priced.amounts, notes, tolerance };
+  async function compute() {
+    const built = await buildEstimate(jobId, settings.data, experience.data?.observations ?? []);
+    if ("error" in built) { toast.error(built.error); return null; }
+    return built;
   }
 
   async function create() {
-    const built = await guideAmounts();
+    const built = await compute();
     if (!built) return;
     const { data, error } = await supabase.from("cost_estimates")
       .insert({ job_id: jobId, version: (list[0]?.version ?? 0) + 1, tolerance: built.tolerance, notes: built.notes })
       .select("id").single();
     if (error) return toast.error(error.message);
-    await supabase.from("cost_estimate_items").insert(ESTIMATE_SECTIONS.map((section, i) => ({
-      estimate_id: data.id, section, description: section, amount: built.amounts[section] ?? 0, sort_order: i,
-    })));
-    toast.success(built.notes.startsWith("Vorbefüllt") ? "Mit Richtwerten aus Material & Arbeit vorbefüllt" : "Mit Firmenerfahrung und aktuellen Einstellungen vorbefüllt");
+    await saveEstimate(jobId, built, data.id);
+    toast.success("Grobkosten aus der Begehung berechnet");
     setSel(data.id);
     refresh();
   }
@@ -81,20 +49,12 @@ export function CostEstimate({ jobId }: { jobId: string }) {
   const [updating, setUpdating] = useState(false);
   async function update() {
     if (!cur) return;
-    if (!confirm("Beträge aus aktuellem Material & Arbeit neu berechnen? Manuell geänderte Beträge der Standard-Positionen werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
+    if (!confirm("Grobkosten aus der aktuellen Begehung neu berechnen? Manuell geänderte Beträge der Standard-Pakete werden überschrieben. Eigene Zusatzpositionen bleiben.")) return;
     setUpdating(true);
     try {
-      const built = await guideAmounts();
+      const built = await compute();
       if (!built) return;
-      const existing = cur.cost_estimate_items;
-      await Promise.all(ESTIMATE_SECTIONS.map((section, i) => {
-        const row = existing.find((it) => it.section === section && it.description === section)
-          ?? existing.find((it) => it.section === section);
-        const amount = built.amounts[section] ?? 0;
-        if (row) return supabase.from("cost_estimate_items").update({ amount }).eq("id", row.id);
-        return supabase.from("cost_estimate_items").insert({ estimate_id: cur.id, section, description: section, amount, sort_order: i });
-      }));
-      await supabase.from("cost_estimates").update({ notes: built.notes }).eq("id", cur.id);
+      await saveEstimate(jobId, built, cur.id);
       toast.success("Grobkosten aktualisiert");
       refresh();
     } finally {
