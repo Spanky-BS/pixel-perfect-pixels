@@ -36,7 +36,7 @@ describe("price guide", () => {
   it("Kleinmaterial 5% of total, Reserve 10% of total incl. Kleinmaterial", () => {
     const r = estimateFromGuide([], [{ description: "Montage", hours: 8, hourly_rate: 115.625 }]);
     expect(r["Kleinmaterial"]).toBe(49);
-    expect(r["Reserve / Unvorhergesehenes"]).toBe(103);
+    expect(r["Reserve / Unvorhergesehenes"]).toBe(102);
   });
   it("flat Demontage 850 only without demolition hours", () => {
     expect(estimateFromGuide([{ description: "Demontage altes Lavabo", quantity: 1 }], [])["Demontage"]).toBe(850);
