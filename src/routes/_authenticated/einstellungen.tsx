@@ -38,6 +38,8 @@ function SettingsPage() {
     default_hourly_rate: 120,
     default_material_markup: 0,
     estimate_tolerance: 20,
+    estimate_vehicle_per_day: 50,
+    estimate_small_material_pct: 5,
     service_hourly_rate: 120,
     travel_rate: 120,
     vehicle_fee: 0,
@@ -58,6 +60,8 @@ function SettingsPage() {
       default_hourly_rate: Number(settings.data.default_hourly_rate),
       default_material_markup: Number(settings.data.default_material_markup),
       estimate_tolerance: Number(settings.data.estimate_tolerance),
+      estimate_vehicle_per_day: Number(settings.data.estimate_vehicle_per_day),
+      estimate_small_material_pct: Number(settings.data.estimate_small_material_pct),
       service_hourly_rate: Number(settings.data.service_hourly_rate),
       travel_rate: Number(settings.data.travel_rate),
       vehicle_fee: Number(settings.data.vehicle_fee),
@@ -80,6 +84,8 @@ function SettingsPage() {
       vat_rate: s.vat_rate,
       default_material_markup: s.default_material_markup,
       estimate_tolerance: s.estimate_tolerance,
+      estimate_vehicle_per_day: s.estimate_vehicle_per_day,
+      estimate_small_material_pct: s.estimate_small_material_pct,
       currency: "CHF",
     });
     if (error) return toast.error(error.message);
@@ -109,6 +115,8 @@ function SettingsPage() {
         <div className="grid grid-cols-2 gap-3">
           <Field label="MWST %"><Input className="h-12 text-base" type="number" step="0.1" inputMode="decimal" value={s.vat_rate} onChange={(e) => setS({ ...s, vat_rate: Number(e.target.value) })} /></Field>
           <Field label="Grobkosten-Toleranz %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_tolerance} onChange={(e) => setS({ ...s, estimate_tolerance: Number(e.target.value) })} /></Field>
+          <Field label="Grobkosten: Fahrzeug CHF pro Tag (8 h)"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_vehicle_per_day} onChange={(e) => setS({ ...s, estimate_vehicle_per_day: Number(e.target.value) })} /></Field>
+          <Field label="Grobkosten: Kleinmaterial %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.estimate_small_material_pct} onChange={(e) => setS({ ...s, estimate_small_material_pct: Number(e.target.value) })} /></Field>
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
         </div>
         <Button className="h-12 w-full font-medium" onClick={saveCompany}>Preise speichern</Button>
