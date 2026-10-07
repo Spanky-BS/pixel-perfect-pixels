@@ -412,8 +412,10 @@ export type Database = {
           hourly_rate: number
           hours: number
           id: string
+          item_type: string
           job_id: string
           notes: string | null
+          parent_id: string | null
           sort_order: number
           source: string
           updated_at: string
@@ -426,8 +428,10 @@ export type Database = {
           hourly_rate?: number
           hours?: number
           id?: string
+          item_type?: string
           job_id: string
           notes?: string | null
+          parent_id?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
@@ -440,8 +444,10 @@ export type Database = {
           hourly_rate?: number
           hours?: number
           id?: string
+          item_type?: string
           job_id?: string
           notes?: string | null
+          parent_id?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
@@ -453,6 +459,13 @@ export type Database = {
             columns: ["job_id"]
             isOneToOne: false
             referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "labour_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "labour_items"
             referencedColumns: ["id"]
           },
         ]
