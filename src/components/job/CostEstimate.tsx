@@ -55,7 +55,8 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
   }
 
   async function analyzeAndCalc() {
-    await ai.analyze();
+    const ok = await ai.analyze();
+    if (ok === null) return; // AI failed: keep the current estimate untouched
     try { await writeEstimate(); toast.success("Grobkosten berechnet"); } catch (e) { toast.error(e instanceof Error ? e.message : "Fehler"); }
   }
   const [updating, setUpdating] = useState(false);

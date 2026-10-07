@@ -26,7 +26,8 @@ export function useAnalyzeAndApply(jobId: string) {
   const settings = useQuery(settingsQuery());
   const [busy, setBusy] = useState(false);
 
-  async function analyze(): Promise<boolean> {
+  /** true = new data applied, false = nothing new, null = failed */
+  async function analyze(): Promise<boolean | null> {
     setBusy(true);
     try {
       const r = await run({ data: { jobId } });
@@ -63,7 +64,7 @@ export function useAnalyzeAndApply(jobId: string) {
       return true;
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Auswertung fehlgeschlagen");
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
