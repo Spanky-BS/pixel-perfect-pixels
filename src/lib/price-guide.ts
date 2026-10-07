@@ -74,7 +74,7 @@ const q4 = (h: number) => Math.round(h * 4) / 4;
 /** "Demontage und Remontage von 1 Pissoir" -> "1 Pissoir" */
 export function splitObject(description: string): string {
   const von = description.match(/\bvon\s+(.+)$/i);
-  if (von) return von[1].trim();
+  if (von?.[1]) return von[1].trim();
   return description
     .replace(/\b(demontage|rückbau|rueckbau|remontage|wiedermontage|montage|wiederanschluss|anschluss|befüllung|und|sowie)\b/gi, "")
     .replace(/[,]+/g, " ").replace(/\s+/g, " ").trim() || description;
