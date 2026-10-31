@@ -1,23 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, FileText, Pencil, Share2, Trash2 } from "lucide-react";
-import { downloadFile, elementToPdf, shareOrDownload } from "@/lib/pdf";
+import { AlertTriangle, CheckCircle2, ChevronRight, Download, Mail, Plus, Tag, XCircle } from "lucide-react";
+import { elementToPdf, downloadFile } from "@/lib/pdf";
+import { greeting, sendPdfByMail, signature } from "@/lib/mail";
 import { SERVICE_REPORT_CSS } from "@/lib/service-report";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { MaterialList } from "@/components/job/MaterialList";
 import { useLabour } from "@/components/job/LabourList";
 import { useMaterials } from "@/components/job/MaterialList";
+import { ProductSearch } from "@/components/job/ProductSearch";
 import { Row } from "@/components/job/Kalkulation";
 import { settingsQuery } from "@/lib/queries";
-import {
-  COMPANY,
-} from "@/lib/company";
+import { COMPANY } from "@/lib/company";
 import {
   STANDARD_WORK_POSITIONS,
   address,
   customerName,
+  defaultTechnician,
   formatCHF,
   formatDate,
   isOfferLocked,
@@ -33,6 +32,10 @@ const seedingJobs = new Set<string>();
 
 type JobWithCustomer = Job & { customers?: (Pick<Customer, "id" | "company_name" | "first_name" | "last_name"> & Partial<Customer>) | null | undefined };
 
+export function offerNumber(job: Pick<Job, "id" | "created_at">) {
+  return `OF-${new Date(job.created_at).getFullYear()}-${job.id.slice(0, 6).toUpperCase()}`;
+}
+
 export function OfferteWorkspace({
   job,
   jobId,
@@ -40,6 +43,7 @@ export function OfferteWorkspace({
   onEditMaterial,
   onViewSources,
   onConfirmed,
+  onDeclined,
   onTouchOfferte,
 }: {
   job: JobWithCustomer;
@@ -48,103 +52,48 @@ export function OfferteWorkspace({
   onEditMaterial: (d: Partial<Material> & { job_id: string }) => void;
   onViewSources: () => void;
   onConfirmed: () => void;
-  onTouchOfferte: () => void;
-}) {
-  const locked = isOfferLocked(job.status);
-  const [mode, setMode] = useState<"edit" | "preview">(locked ? "preview" : "edit");
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Offerte</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {locked
-            ? "Vom Kunden bestätigt – SOLL-Positionen bleiben unverändert."
-            : "Bearbeiten bis der Kunde bestätigt. Danach startet die Ausführung."}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
-        {([["edit", "Bearbeiten"], ["preview", "Vorschau"]] as const).map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setMode(k)}
-            className={`h-11 rounded-lg text-sm font-medium ${mode === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground"}`}
-          >
-            {l}
-          </button>
-        ))}
-      </div>
-      {mode === "edit"
-        ? (
-          <OfferteEdit
-            job={job}
-            jobId={jobId}
-            locked={locked}
-            onEditLabour={onEditLabour}
-            onEditMaterial={onEditMaterial}
-            onViewSources={onViewSources}
-            onConfirmed={onConfirmed}
-            onTouchOfferte={onTouchOfferte}
-          />
-        )
-        : <OffertePreview job={job} jobId={jobId} />}
-    </div>
-  );
-}
-
-function OfferteEdit({
-  job,
-  jobId,
-  locked,
-  onEditLabour,
-  onEditMaterial,
-  onViewSources,
-  onConfirmed,
-  onTouchOfferte,
-}: {
-  job: JobWithCustomer;
-  jobId: string;
-  locked: boolean;
-  onEditLabour: (d: Partial<Labour> & { job_id: string }) => void;
-  onEditMaterial: (d: Partial<Material> & { job_id: string }) => void;
-  onViewSources: () => void;
-  onConfirmed: () => void;
+  onDeclined: () => void;
   onTouchOfferte: () => void;
 }) {
   const qc = useQueryClient();
+  const locked = isOfferLocked(job.status);
   const settings = useQuery(settingsQuery());
   const labour = useLabour(jobId);
   const materials = useMaterials(jobId);
+  const [productFor, setProductFor] = useState<Material | null>(null);
+  const sent = useQuery({
+    queryKey: ["quotations", jobId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("quotations").select("*").eq("job_id", jobId).order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
   const quoted = quotedLabour(labour.data);
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
-  const totals = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0));
+  const markup = Number(settings.data?.default_material_markup ?? 0);
+  const validDays = Number(settings.data?.offer_valid_days ?? 30);
+  const totals = computeQuote(labour.data, materials.data, vatRate, markup);
+  const openHours = quoted.filter((l) => !(Number(l.hours) > 0)).length;
+  const lastSent = (sent.data ?? []).find((q) => q.status === "Versendet");
+  const rate = Number(settings.data?.default_hourly_rate ?? 120);
 
   useEffect(() => {
-    if (labour.isLoading || quoted.length) return;
+    if (labour.isLoading || quoted.length || locked) return;
     void seedDefaults();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [labour.isLoading, quoted.length]);
 
   async function seedDefaults() {
-    if (locked || seedingJobs.has(jobId)) return;
+    if (seedingJobs.has(jobId)) return;
     seedingJobs.add(jobId);
     try {
       const { data: existing } = await supabase.from("labour_items").select("description").eq("job_id", jobId);
       const have = new Set((existing ?? []).map((l) => l.description.trim().toLowerCase()));
       const missing = STANDARD_WORK_POSITIONS.filter((t) => !have.has(t.toLowerCase()));
       if (!missing.length) return;
-      const rate = Number(settings.data?.default_hourly_rate ?? 120);
       const { error } = await supabase.from("labour_items").insert(
-        missing.map((title, i) => ({
-          job_id: jobId,
-          description: title,
-          hours: 0,
-          hourly_rate: rate,
-          notes: "",
-          source: "manual",
-          sort_order: i,
-        })),
+        missing.map((title, i) => ({ job_id: jobId, description: title, hours: 0, hourly_rate: rate, notes: "", source: "manual", sort_order: i })),
       );
       if (error) return toast.error(error.message);
       qc.invalidateQueries({ queryKey: ["labour", jobId] });
@@ -154,249 +103,186 @@ function OfferteEdit({
     }
   }
 
-  async function addMissingStandards() {
-    const have = new Set(quoted.map((l) => l.description.trim().toLowerCase()));
-    const missing = STANDARD_WORK_POSITIONS.filter((t) => !have.has(t.toLowerCase()));
-    if (!missing.length) return toast.message("Standardpositionen sind bereits vorhanden");
-    const rate = Number(settings.data?.default_hourly_rate ?? 120);
-    const { error } = await supabase.from("labour_items").insert(
-      missing.map((title, i) => ({
-        job_id: jobId,
-        description: title,
-        hours: 0,
-        hourly_rate: rate,
-        notes: "",
-        source: "manual",
-        sort_order: Date.now() % 1e9 + i,
-      })),
-    );
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["labour", jobId] });
-    onTouchOfferte();
-  }
-
-  async function removeLabour(l: Labour) {
-    if (!confirm("Position aus der Offerte entfernen?")) return;
-    const { error } = await supabase.from("labour_items").delete().eq("id", l.id);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["labour", jobId] });
-  }
-
   return (
-    <div className="space-y-6">
-      <section className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold leading-snug">Arbeiten</h3>
-          {!locked && (
-            <button
-              type="button"
-              className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary"
-              onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) })}
-            >
-              + Position
-            </button>
-          )}
+    <div className="space-y-4 pb-4">
+      <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground" style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-primary)" }}>
+        <div className="p-5 pb-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Offerte · inkl. MWST</span>
+            <span className="text-[11px] font-medium opacity-70 tabular">{offerNumber(job)}</span>
+          </div>
+          <div className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular">{formatCHF(totals.total)}</div>
+          <div className="mt-2 text-sm opacity-80 tabular">Netto {formatCHF(totals.subtotal)} · MWST {vatRate}% {formatCHF(totals.vat)}</div>
         </div>
-        <div className="rounded-lg border border-border/80 bg-card">
-          {!quoted.length && <p className="px-3 py-4 text-sm text-muted-foreground">Noch keine Arbeitspositionen.</p>}
-          {quoted.map((l) => (
-            <div key={l.id} className="border-b border-border/70 px-3 py-3 last:border-b-0">
-              <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 text-left"
-                  onClick={() => !locked && onEditLabour(l)}
-                >
-                  <p className="font-semibold">{l.description || "–"}</p>
-                  {l.notes?.trim() && <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
-                  <p className="mt-1 font-mono text-sm text-muted-foreground">
-                    {Number(l.hours) > 0
-                      ? `${Number(l.hours).toLocaleString("de-CH")} h × ${formatCHF(Number(l.hourly_rate))}`
-                      : "Stunden noch offen"}
-                  </p>
-                </button>
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="font-mono text-sm font-medium">{formatCHF(labourQuoteAmount(l))}</span>
-                  {!locked && (
-                    <>
-                      <button type="button" aria-label="Bearbeiten" className="flex h-10 w-10 items-center justify-center text-muted-foreground" onClick={() => onEditLabour(l)}>
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button type="button" aria-label="Entfernen" className="flex h-10 w-10 items-center justify-center text-destructive" onClick={() => void removeLabour(l)}>
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
+        <div className="flex items-center justify-between border-t border-primary-foreground/15 px-5 py-2.5 text-sm">
+          <span className="opacity-80">{locked ? "Vom Kunden bestätigt" : `Gültig ${validDays} Tage`}</span>
+          <span className="opacity-80">{lastSent ? `Versendet ${formatDate(lastSent.created_at)}` : "Noch nicht versendet"}</span>
+        </div>
+      </section>
+
+      {(totals.unpriced > 0 || openHours > 0) && !locked && (
+        <div className="flex gap-2.5 rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <div className="space-y-0.5">
+            {totals.unpriced > 0 && <p>{totals.unpriced} Material ohne Preis – «Produkt wählen» antippen.</p>}
+            {openHours > 0 && <p>{openHours} Arbeit{openHours === 1 ? "" : "en"} ohne Stunden.</p>}
+          </div>
+        </div>
+      )}
+
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between px-1">
+          <h2 className="section-title">Arbeiten</h2>
+          <span className="text-sm text-muted-foreground tabular">{totals.hours.toLocaleString("de-CH")} h · {formatCHF(totals.labourTotal)}</span>
+        </div>
+        <div className="list-group">
+          {!quoted.length && <p className="px-4 py-4 text-sm text-muted-foreground">Noch keine Arbeitspositionen.</p>}
+          {quoted.map((l) => {
+            const h = Number(l.hours);
+            return (
+              <button key={l.id} type="button" disabled={locked} onClick={() => onEditLabour(l)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-muted/60 disabled:active:bg-transparent">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px]">{l.description || "–"}</div>
+                  <div className={`text-xs tabular ${h > 0 ? "text-muted-foreground" : "font-medium text-warning"}`}>
+                    {h > 0 ? `${h.toLocaleString("de-CH")} h × ${formatCHF(Number(l.hourly_rate))}` : "Stunden offen"}
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        {!locked && (
-          <button type="button" className="text-sm font-medium text-primary" onClick={() => void addMissingStandards()}>
-            Standardpositionen ergänzen
-          </button>
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold">Material</h3>
+                <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(labourQuoteAmount(l))}</span>
+                {!locked && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              </button>
+            );
+          })}
           {!locked && (
-            <button
-              type="button"
-              className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary"
-              onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen" })}
-            >
-              + Material
+            <button type="button" onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: rate })} className="flex h-12 w-full items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted">
+              <Plus className="h-4 w-4" /> Arbeit hinzufügen
             </button>
           )}
         </div>
-        <Button variant="outline" className="h-11 w-full" onClick={onViewSources}>Unterlagen</Button>
-        <MaterialList jobId={jobId} onEdit={locked ? () => {} : onEditMaterial} readOnly={locked} />
       </section>
 
-      <section className={`rounded-lg border-2 bg-card p-4 ${totals.incomplete ? "border-warning" : "border-border"}`}>
-        {totals.incomplete && (
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-warning">
-            {totals.unpriced} Materialposition{totals.unpriced === 1 ? "" : "en"} ohne Preis
-          </p>
-        )}
-        <Row label="Arbeit" value={formatCHF(totals.labourTotal)} />
-        <Row label="Material" value={formatCHF(totals.materialTotal)} />
-        <Row label={totals.incomplete ? "Zwischensumme (vorläufig)" : "Zwischensumme"} value={formatCHF(totals.subtotal)} />
-        <Row label={`MWST ${vatRate}%`} value={formatCHF(totals.vat)} />
-        <Row label={totals.incomplete ? "Total CHF (vorläufig)" : "Total CHF"} value={formatCHF(totals.total)} bold />
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between px-1">
+          <h2 className="section-title">Material</h2>
+          <span className="text-sm text-muted-foreground tabular">{formatCHF(totals.materialTotal)}</span>
+        </div>
+        <div className="list-group">
+          {!materials.data?.length && <p className="px-4 py-4 text-sm text-muted-foreground">Noch kein Material.</p>}
+          {(materials.data ?? []).map((m) => {
+            const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
+            const qty = Number(m.quantity);
+            const vk = p ? unitSalesPrice(p, markup) : null;
+            return (
+              <div key={m.id} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
+                <button type="button" disabled={locked} onClick={() => onEditMaterial(m)} className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-[15px]">{p?.name || m.description || "–"}</div>
+                  <div className="text-xs text-muted-foreground tabular">
+                    {qty.toLocaleString("de-CH")} {m.unit}{vk != null ? ` × ${formatCHF(vk)}` : ""}
+                  </div>
+                </button>
+                {vk != null ? (
+                  <button type="button" disabled={locked} onClick={() => setProductFor(m)} className="shrink-0 text-[15px] font-medium tabular">{formatCHF(vk * qty)}</button>
+                ) : (
+                  <button type="button" disabled={locked} onClick={() => setProductFor(m)} className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-3 text-sm font-medium">
+                    <Tag className="h-3.5 w-3.5" /> Produkt wählen
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {!locked && (
+            <div className="grid grid-cols-2 divide-x divide-border">
+              <button type="button" onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen" })} className="flex h-12 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted">
+                <Plus className="h-4 w-4" /> Material
+              </button>
+              <button type="button" onClick={onViewSources} className="flex h-12 items-center justify-center text-sm font-medium text-primary active:bg-muted">Unterlagen</button>
+            </div>
+          )}
+        </div>
       </section>
 
-      <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
-        <FileText className="h-4 w-4" /> Offerte in Bexio erstellen (folgt)
-      </button>
+      <OffertePdfActions
+        job={job}
+        quoted={quoted}
+        materials={materials.data ?? []}
+        markup={markup}
+        vatRate={vatRate}
+        validDays={validDays}
+        totals={totals}
+        settings={settings.data}
+        onSent={async () => {
+          await supabase.from("quotations").insert({ job_id: jobId, status: "Versendet", total: totals.total });
+          qc.invalidateQueries({ queryKey: ["quotations", jobId] });
+        }}
+      />
 
       {!locked && (
-        <Button
-          className="h-14 w-full text-base font-semibold"
-          onClick={() => {
-            if (!confirm("Offerte von Kunde bestätigt? Das Projekt wechselt in die Ausführung. Die Offertpositionen bleiben als SOLL erhalten.")) return;
-            void onConfirmed();
-          }}
-        >
-          Offerte von Kunde bestätigt
-        </Button>
+        <section className="surface space-y-3 p-4">
+          <div>
+            <h3 className="text-[15px] font-semibold">Kundenentscheid</h3>
+            <p className="text-xs text-muted-foreground">Bei Zusage startet die Ausführung. Die Offerte bleibt als SOLL erhalten.</p>
+          </div>
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <button
+              onClick={() => { if (confirm("Offerte vom Kunden bestätigt? Das Projekt wechselt in die Ausführung.")) onConfirmed(); }}
+              className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-[15px] font-semibold text-primary-foreground"
+            ><CheckCircle2 className="h-5 w-5" /> Kunde hat bestätigt</button>
+            <button onClick={onDeclined} className="flex h-12 items-center justify-center gap-1.5 rounded-xl border border-border px-4 text-sm font-medium text-destructive">
+              <XCircle className="h-4 w-4" /> Abgesagt
+            </button>
+          </div>
+        </section>
+      )}
+
+      {productFor && (
+        <ProductSearch open materialId={productFor.id} jobId={jobId} hint={productFor.description} onClose={() => setProductFor(null)} />
       )}
     </div>
   );
 }
 
-function OffertePreview({ job, jobId }: { job: JobWithCustomer; jobId: string }) {
-  const settings = useQuery(settingsQuery());
-  const labour = useLabour(jobId);
-  const materials = useMaterials(jobId);
-  const vatRate = Number(settings.data?.vat_rate ?? 8.1);
-  const markup = Number(settings.data?.default_material_markup ?? 0);
-  const quoted = quotedLabour(labour.data);
-  const totals = computeQuote(labour.data, materials.data, vatRate, markup);
-  const company = settings.data?.company_name?.trim() || COMPANY.name;
-  const c = job.customers;
-
-  return (
-    <div className="space-y-5 rounded-lg border border-border/80 bg-card p-4">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Offerte</p>
-        <p className="mt-1 text-lg font-semibold">{company}</p>
-        <p className="text-sm text-muted-foreground">{COMPANY.street}, {COMPANY.zipCity}</p>
-      </div>
-      <dl className="border-y border-border/80">
-        <PreviewRow label="Kunde" value={customerName(c)} />
-        <PreviewRow label="Projekt" value={job.title} />
-        <PreviewRow label="Adresse" value={address(job) || "–"} />
-        <PreviewRow label="Datum" value={formatDate(new Date().toISOString())} />
-      </dl>
-
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Arbeiten</h3>
-        {quoted.map((l) => (
-          <div key={l.id} className="border-b border-border/70 py-2 last:border-b-0">
-            <div className="flex items-start justify-between gap-3">
-              <p className="font-medium">{l.description || "–"}</p>
-              <p className="shrink-0 font-mono text-sm">{formatCHF(labourQuoteAmount(l))}</p>
-            </div>
-            {l.notes?.trim() && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
-            {Number(l.hours) > 0 && (
-              <p className="mt-0.5 text-xs text-muted-foreground">{Number(l.hours).toLocaleString("de-CH")} h × {formatCHF(Number(l.hourly_rate))}</p>
-            )}
-          </div>
-        ))}
-        {!quoted.length && <p className="text-sm text-muted-foreground">Keine Arbeitspositionen.</p>}
-      </div>
-
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Material</h3>
-        {(materials.data ?? []).map((m) => {
-          const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
-          const qty = Number(m.quantity);
-          const vk = p ? unitSalesPrice(p, markup) : null;
-          return (
-            <div key={m.id} className="flex items-start justify-between gap-3 border-b border-border/70 py-2 last:border-b-0">
-              <div className="min-w-0">
-                <p className="font-medium">{p?.name || m.description || "–"}</p>
-                <p className="text-xs text-muted-foreground">
-                  {qty} {m.unit}
-                  {p?.manufacturer_article_no ? ` · Herst. ${p.manufacturer_article_no}` : ""}
-                  {p?.supplier_article_no ? ` · Art. ${p.supplier_article_no}` : ""}
-                </p>
-              </div>
-              <p className="shrink-0 font-mono text-sm">{vk != null ? formatCHF(vk * qty) : "–"}</p>
-            </div>
-          );
-        })}
-        {!materials.data?.length && <p className="text-sm text-muted-foreground">Kein Material.</p>}
-      </div>
-
-      <div className="border-t border-border/80 pt-2">
-        <Row label="Zwischensumme" value={formatCHF(totals.subtotal)} />
-        <Row label={`MWST ${vatRate}%`} value={formatCHF(totals.vat)} />
-        <Row label="Total CHF" value={formatCHF(totals.total)} bold />
-      </div>
-      <OffertePdfActions job={job} quoted={quoted} materials={materials.data ?? []} markup={markup} vatRate={vatRate} totals={totals} company={company} />
-    </div>
-  );
-}
+type SettingsRow = { company_name?: string | null; default_technician?: string | null; technician_phone?: string | null } | null | undefined;
 
 function OffertePdfActions({
-  job, quoted, materials, markup, vatRate, totals, company,
+  job, quoted, materials, markup, vatRate, validDays, totals, settings, onSent,
 }: {
   job: JobWithCustomer;
   quoted: Labour[];
   materials: Material[];
   markup: number;
   vatRate: number;
+  validDays: number;
   totals: ReturnType<typeof computeQuote>;
-  company: string;
+  settings: SettingsRow;
+  onSent: () => Promise<void>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const company = settings?.company_name?.trim() || COMPANY.name;
   const c = job.customers;
   const today = formatDate(new Date().toISOString());
-  const nr = `OF-${new Date(job.created_at).getFullYear()}-${job.id.slice(0, 6).toUpperCase()}`;
+  const nr = offerNumber(job);
   const filename = `Offerte_${nr}_${(job.title || "Projekt").replace(/[^\w\-äöüÄÖÜ]+/g, "_")}`;
   const contact = c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "";
   const custLines = c ? [c.company_name, contact, c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
 
-  async function run(share: boolean) {
+  async function run(mode: "download" | "mail") {
     if (!ref.current) return;
     setBusy(true);
     const t = toast.loading("PDF wird erstellt…");
     try {
       const file = await elementToPdf(ref.current, filename);
-      if (share) {
-        const r = await shareOrDownload(file, `Offerte ${nr}`);
-        if (r === "downloaded") toast.success("PDF heruntergeladen", { id: t });
-        else toast.dismiss(t);
-      } else {
+      toast.dismiss(t);
+      if (mode === "download") {
         downloadFile(file);
-        toast.success("PDF gespeichert", { id: t });
+        toast.success("PDF gespeichert");
+        return;
       }
+      const ok = await sendPdfByMail(file, {
+        to: c?.email,
+        subject: `Offerte ${nr} – ${job.title}`,
+        body: `${greeting(c)}\n\nIm Anhang erhalten Sie unsere Offerte ${nr} für «${job.title}».\nDie Offerte ist ${validDays} Tage gültig. Für Fragen stehe ich Ihnen gerne zur Verfügung.\n\n${signature({ technician: defaultTechnician(settings), company, phone: settings?.technician_phone || COMPANY.phone })}`,
+      });
+      if (ok) await onSent();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "PDF fehlgeschlagen", { id: t });
     } finally {
@@ -406,15 +292,15 @@ function OffertePdfActions({
 
   return (
     <>
-      {totals.incomplete && <p className="rounded-lg border border-warning bg-warning/15 p-3 text-sm">{totals.unpriced} Material-Position(en) ohne Preis – im PDF als «–» aufgeführt.</p>}
       <div className="grid grid-cols-2 gap-2">
-        <Button className="h-12 font-semibold" disabled={busy} onClick={() => void run(false)}>
-          <Download className="h-4 w-4" /> Offerte als PDF
-        </Button>
-        <Button variant="outline" className="h-12 font-semibold" disabled={busy} onClick={() => void run(true)}>
-          <Share2 className="h-4 w-4" /> PDF teilen
-        </Button>
+        <button disabled={busy} onClick={() => void run("download")} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-medium disabled:opacity-60" style={{ boxShadow: "var(--shadow-card)" }}>
+          <Download className="h-4 w-4 text-primary" /> PDF herunterladen
+        </button>
+        <button disabled={busy} onClick={() => void run("mail")} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-medium disabled:opacity-60" style={{ boxShadow: "var(--shadow-card)" }}>
+          <Mail className="h-4 w-4 text-primary" /> Per E-Mail senden
+        </button>
       </div>
+      {totals.unpriced > 0 && <p className="px-1 text-xs text-muted-foreground">Material ohne Preis erscheint im PDF mit «–».</p>}
       <div aria-hidden style={{ position: "fixed", left: "-10000px", top: 0, width: "190mm" }}>
         <style>{SERVICE_REPORT_CSS}</style>
         <div ref={ref} className="sr-page" style={{ background: "#fff", padding: "0" }}>
@@ -441,7 +327,7 @@ function OffertePdfActions({
                 <dt>Offertnummer:</dt><dd>{nr}</dd>
                 <dt>Datum:</dt><dd>{today}</dd>
                 <dt>Objekt:</dt><dd>{address(job) || "–"}</dd>
-                <dt>Gültig:</dt><dd>30 Tage</dd>
+                <dt>Gültig:</dt><dd>{validDays} Tage</dd>
               </dl>
             </div>
           </div>
@@ -493,10 +379,10 @@ function OffertePdfActions({
             <table><tbody>
               <tr><td>Zwischensumme netto:</td><td className="num">{formatCHF(totals.subtotal)}</td></tr>
               <tr><td>MWST {vatRate}%:</td><td className="num">{formatCHF(totals.vat)}</td></tr>
-              <tr className="grand"><td>Totalbetrag:</td><td className="num">{formatCHF(totals.total)}</td></tr>
+              <tr className="grand"><td>Totalbetrag inkl. MWST:</td><td className="num">{formatCHF(totals.total)}</td></tr>
             </tbody></table>
           </div>
-          <p style={{ marginTop: 14 }}>Wir danken für Ihre Anfrage und freuen uns auf Ihren Auftrag. Preise in CHF, inkl. MWST, gültig 30 Tage.</p>
+          <p style={{ marginTop: 14 }}>Wir danken für Ihre Anfrage und freuen uns auf Ihren Auftrag. Preise in CHF. Verrechnet wird nach effektivem Aufwand. Die Offerte ist {validDays} Tage gültig.</p>
           <div className="sr-sig">
             <div><div className="sr-sig-empty" /><div className="sr-line">Ort / Datum / Unterschrift Kunde</div></div>
             <div><div className="sr-sig-empty" /><div className="sr-line">{company}</div></div>
@@ -508,15 +394,6 @@ function OffertePdfActions({
   );
 }
 
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-2 text-sm">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
-    </div>
-  );
-}
-
 export function QuoteTotalsCard({ jobId }: { jobId: string }) {
   const settings = useQuery(settingsQuery());
   const labour = useLabour(jobId);
@@ -524,7 +401,7 @@ export function QuoteTotalsCard({ jobId }: { jobId: string }) {
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
   const totals = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0));
   return (
-    <section className={`rounded-lg border-2 bg-card p-4 ${totals.incomplete ? "border-warning" : "border-border"}`}>
+    <section className="surface p-4">
       <h3 className="mb-2 text-sm font-semibold">Offerte (SOLL)</h3>
       <Row label="Arbeit" value={`${totals.hours.toLocaleString("de-CH")} h · ${formatCHF(totals.labourTotal)}`} />
       <Row label="Material" value={formatCHF(totals.materialTotal)} />
@@ -533,3 +410,5 @@ export function QuoteTotalsCard({ jobId }: { jobId: string }) {
     </section>
   );
 }
+
+export { customerName };
