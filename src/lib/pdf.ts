@@ -35,7 +35,7 @@ export async function appendQrBillPage(pdf: JsPdf, svg: string, heading: string)
   pdf.addPage("a4", "portrait");
   pdf.setFontSize(11);
   pdf.text(heading, 15, 20);
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 192, 210, 105);
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 192, 210, 105, undefined, "FAST");
 }
 
 export function downloadFile(file: File) {
