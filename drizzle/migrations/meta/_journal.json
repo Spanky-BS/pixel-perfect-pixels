@@ -99,6 +99,13 @@
       "when": 1793486041375,
       "tag": "0013_estimate_rates_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793487948052,
+      "tag": "0014_customer_invoices",
+      "breakpoints": true
     }
   ]
 }

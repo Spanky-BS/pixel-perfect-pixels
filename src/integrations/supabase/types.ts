@@ -176,6 +176,80 @@ export type Database = {
           },
         ]
       }
+      customer_invoices: {
+        Row: {
+          akonto_deducted: number
+          amount_due: number
+          created_at: string
+          due_date: string
+          id: string
+          invoice_date: string
+          job_id: string
+          kind: string
+          lines: Json
+          net: number
+          number: string
+          paid_at: string | null
+          sent_at: string | null
+          status: string
+          title: string
+          total: number
+          user_id: string
+          vat: number
+          vat_rate: number
+        }
+        Insert: {
+          akonto_deducted?: number
+          amount_due?: number
+          created_at?: string
+          due_date: string
+          id?: string
+          invoice_date?: string
+          job_id: string
+          kind?: string
+          lines?: Json
+          net?: number
+          number: string
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          total?: number
+          user_id?: string
+          vat?: number
+          vat_rate?: number
+        }
+        Update: {
+          akonto_deducted?: number
+          amount_due?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          invoice_date?: string
+          job_id?: string
+          kind?: string
+          lines?: Json
+          net?: number
+          number?: string
+          paid_at?: string | null
+          sent_at?: string | null
+          status?: string
+          title?: string
+          total?: number
+          user_id?: string
+          vat?: number
+          vat_rate?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           city: string | null
@@ -1070,6 +1144,7 @@ export type Database = {
       }
       settings: {
         Row: {
+          akonto_payment_days: number
           company_name: string
           currency: string
           default_hourly_rate: number
@@ -1078,6 +1153,9 @@ export type Database = {
           estimate_small_material_pct: number
           estimate_tolerance: number
           estimate_vehicle_per_day: number
+          iban: string | null
+          invoice_payment_days: number
+          offer_valid_days: number
           service_hourly_rate: number
           small_material_allowance: number
           technician_city: string | null
@@ -1094,6 +1172,7 @@ export type Database = {
           vehicle_fee: number
         }
         Insert: {
+          akonto_payment_days?: number
           company_name?: string
           currency?: string
           default_hourly_rate?: number
@@ -1102,6 +1181,9 @@ export type Database = {
           estimate_small_material_pct?: number
           estimate_tolerance?: number
           estimate_vehicle_per_day?: number
+          iban?: string | null
+          invoice_payment_days?: number
+          offer_valid_days?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
@@ -1118,6 +1200,7 @@ export type Database = {
           vehicle_fee?: number
         }
         Update: {
+          akonto_payment_days?: number
           company_name?: string
           currency?: string
           default_hourly_rate?: number
@@ -1126,6 +1209,9 @@ export type Database = {
           estimate_small_material_pct?: number
           estimate_tolerance?: number
           estimate_vehicle_per_day?: number
+          iban?: string | null
+          invoice_payment_days?: number
+          offer_valid_days?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
