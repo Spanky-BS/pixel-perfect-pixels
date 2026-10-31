@@ -60,8 +60,8 @@ function SettingsPage() {
       default_hourly_rate: Number(settings.data.default_hourly_rate),
       default_material_markup: Number(settings.data.default_material_markup),
       estimate_tolerance: Number(settings.data.estimate_tolerance),
-      estimate_vehicle_per_day: Number(settings.data.estimate_vehicle_per_day),
-      estimate_small_material_pct: Number(settings.data.estimate_small_material_pct),
+      estimate_vehicle_per_day: Number((settings.data as { estimate_vehicle_per_day?: number }).estimate_vehicle_per_day ?? 50),
+      estimate_small_material_pct: Number((settings.data as { estimate_small_material_pct?: number }).estimate_small_material_pct ?? 5),
       service_hourly_rate: Number(settings.data.service_hourly_rate),
       travel_rate: Number(settings.data.travel_rate),
       vehicle_fee: Number(settings.data.vehicle_fee),
@@ -84,10 +84,9 @@ function SettingsPage() {
       vat_rate: s.vat_rate,
       default_material_markup: s.default_material_markup,
       estimate_tolerance: s.estimate_tolerance,
-      estimate_vehicle_per_day: s.estimate_vehicle_per_day,
-      estimate_small_material_pct: s.estimate_small_material_pct,
       currency: "CHF",
-    });
+      ...({ estimate_vehicle_per_day: s.estimate_vehicle_per_day, estimate_small_material_pct: s.estimate_small_material_pct } as Record<string, number>),
+    } as never);
     if (error) return toast.error(error.message);
     toast.success("Firmeneinstellungen gespeichert");
     qc.invalidateQueries({ queryKey: ["settings"] });

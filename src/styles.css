@@ -50,11 +50,12 @@
 }
 
 :root {
-  --radius: 1rem;
-  --background: oklch(0.975 0.004 250);
+  --radius: 0.75rem;
+  --background: oklch(0.982 0.003 250);
   --primary-glow: oklch(0.39 0.085 258);
   --gradient-primary: linear-gradient(145deg, var(--primary-glow), var(--primary));
-  --shadow-card: 0 1px 2px oklch(0.2 0.03 255 / 0.04), 0 8px 24px -18px oklch(0.2 0.03 255 / 0.22);
+  --shadow-card: 0 1px 0 oklch(0.2 0.03 255 / 0.03), 0 1px 3px oklch(0.2 0.03 255 / 0.05);
+  --shadow-float: 0 12px 32px -12px oklch(0.2 0.03 255 / 0.25), 0 2px 6px oklch(0.2 0.03 255 / 0.06);
   --shadow-primary: 0 8px 18px -14px oklch(0.34 0.1 258 / 0.65);
   --foreground: oklch(0.2 0.03 255);
   --card: oklch(1 0 0);
@@ -130,6 +131,13 @@
     @apply mb-1.5 block text-sm font-medium text-muted-foreground;
   }
   .section-title {
-    @apply text-base font-semibold tracking-tight text-foreground;
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
+  }
+  .list-group {
+    @apply overflow-hidden rounded-xl border border-border bg-card divide-y divide-border;
+    box-shadow: var(--shadow-card);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }

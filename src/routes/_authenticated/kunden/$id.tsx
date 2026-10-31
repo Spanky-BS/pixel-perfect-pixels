@@ -102,13 +102,13 @@ function CustomerPage() {
           {activeJobs.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground">Aktiv</h3>
-              {activeJobs.map((j) => <JobCard key={j.id} job={j} />)}
+              {activeJobs.length > 0 && <div className="list-group">{activeJobs.map((j) => <JobCard key={j.id} job={j} />)}</div>}
             </div>
           )}
           {previousJobs.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-muted-foreground">Bisherige Aufträge</h3>
-              {previousJobs.map((j) => <JobCard key={j.id} job={j} />)}
+              {previousJobs.length > 0 && <div className="list-group">{previousJobs.map((j) => <JobCard key={j.id} job={j} />)}</div>}
             </div>
           )}
           {!jobs.isLoading && !jobs.data?.length && <p className="text-sm text-muted-foreground">Noch keine Aufträge.</p>}
