@@ -19,8 +19,7 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined }: { jobId: strin
   const qc = useQueryClient();
   const settings = useQuery(settingsQuery());
   const ai = useAnalyzeAndApply(jobId);
-  const rateRow = settings.data as { estimate_vehicle_per_day?: number; estimate_small_material_pct?: number } | undefined;
-  const rates = { vehiclePerDay: Number(rateRow?.estimate_vehicle_per_day ?? 50), smallMaterialPct: Number(rateRow?.estimate_small_material_pct ?? 5) };
+  const rates = { vehiclePerDay: Number(settings.data?.estimate_vehicle_per_day ?? 50), smallMaterialPct: Number(settings.data?.estimate_small_material_pct ?? 5) };
   const est = useQuery({
     queryKey: ["estimates", jobId],
     queryFn: async () => {

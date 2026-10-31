@@ -1,0 +1,2 @@
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS estimate_vehicle_per_day numeric NOT NULL DEFAULT 50;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS estimate_small_material_pct numeric NOT NULL DEFAULT 5;

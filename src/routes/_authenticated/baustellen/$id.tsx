@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft, MoreHorizontal, FileUp } from "lucide-react";
+import { Camera, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, FileUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { computeQuote } from "@/lib/project-quote";
 import { StatusBadge } from "@/components/Brand";
 import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
 import { unitSalesPrice } from "@/lib/products";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/baustellen/$id")({
   head: () => ({
@@ -36,6 +36,8 @@ export const Route = createFileRoute("/_authenticated/baustellen/$id")({
       { name: "description", content: "Baustelle mit Fotos, Notizen, Material und Arbeitsleistungen." },
       { property: "og:title", content: "Auftrag – Haustechnik Nordwestschweiz" },
       { property: "og:description", content: "Baustelle mit Fotos, Notizen, Material und Arbeitsleistungen." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: JobPage,
@@ -111,85 +113,94 @@ function JobPage() {
   const addLabour = () => { setLab({ job_id: id, hours: 1, hourly_rate: Number(settings.data?.default_hourly_rate ?? 120) }); };
 
   const captureTiles = (
-    <section className="space-y-4 rounded-2xl border border-primary/15 bg-primary/[0.035] p-4">
-      <div>
-        <h2 className="text-lg font-semibold">Mit KI erfassen</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Einmal erfassen, danach in der Analyse strukturiert prüfen.</p>
+    <section className="surface space-y-3 p-3">
+      <div className="flex items-baseline justify-between px-1 pt-1">
+        <h2 className="text-[15px] font-semibold">Erfassen</h2>
+        <p className="text-xs text-muted-foreground">KI wertet bei Grobkosten aus</p>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <button className="action-tile-primary" onClick={capture.openVoice}><Mic className="h-7 w-7" />Sprache</button>
-        <button className="action-tile-primary" onClick={files.openCamera}><Camera className="h-7 w-7" />Foto</button>
-        <button className="action-tile-primary" onClick={capture.openText}><FileText className="h-7 w-7" />Text</button>
+        <CaptureBtn primary onClick={capture.openVoice} icon={<Mic className="h-6 w-6" strokeWidth={1.75} />}>Sprache</CaptureBtn>
+        <CaptureBtn onClick={files.openCamera} icon={<Camera className="h-6 w-6" strokeWidth={1.75} />}>Foto</CaptureBtn>
+        <CaptureBtn onClick={capture.openText} icon={<FileText className="h-6 w-6" strokeWidth={1.75} />}>Text</CaptureBtn>
       </div>
-      {!service && (
-        <div className="space-y-2 border-t border-primary/10 pt-3">
-          <p className="text-sm font-medium text-muted-foreground">Manuell ergänzen</p>
-          <div className="grid grid-cols-3 gap-2">
-            <SecBtn onClick={files.openUpload} icon={<FileUp className="h-4 w-4" />}>Unterlage</SecBtn>
-            <SecBtn onClick={addMaterial} icon={<Package className="h-4 w-4" />}>Material</SecBtn>
-            <SecBtn onClick={addLabour} icon={<Wrench className="h-4 w-4" />}>Arbeit</SecBtn>
-          </div>
-        </div>
-      )}
+      <button onClick={files.openUpload} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg text-sm font-medium text-primary active:bg-muted">
+        <FileUp className="h-4 w-4" /> Unterlage hochladen (PDF, Plan, Excel)
+      </button>
     </section>
   );
 
+  const mapsUrl = address(j) ? `https://maps.apple.com/?q=${encodeURIComponent(address(j))}` : null;
+
   return (
     <div className="space-y-4">
-      <Link to="/baustellen" className="-ml-1 inline-flex h-10 items-center text-sm font-medium text-muted-foreground">
-        <ChevronLeft className="h-5 w-5" /> Aufträge
-      </Link>
-      <div className="space-y-4 rounded-2xl border border-border/70 bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="flex items-center justify-between gap-2">
+      <div className="-mt-2 flex items-center justify-between">
+        <Link to="/baustellen" className="-ml-1 inline-flex h-10 items-center text-sm font-medium text-muted-foreground">
+          <ChevronLeft className="h-5 w-5" /> Aufträge
+        </Link>
+        {isActiveJob(j) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" aria-label="Weitere Aktionen" className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground active:bg-muted">
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {!service && (
+                <>
+                  <DropdownMenuItem onClick={files.openUpload}><FileUp className="mr-2 h-4 w-4" />Unterlage hochladen</DropdownMenuItem>
+                  <DropdownMenuItem onClick={addMaterial}><Package className="mr-2 h-4 w-4" />Material manuell</DropdownMenuItem>
+                  <DropdownMenuItem onClick={addLabour}><Wrench className="mr-2 h-4 w-4" />Arbeit manuell</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem className="text-destructive" onClick={() => setCancelOpen(true)}>
+                {service ? "Auftrag absagen" : "Projekt absagen"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={async () => {
+                  if (!confirm("Auftrag inkl. aller Fotos, Notizen und Positionen löschen?")) return;
+                  const { error } = await supabase.from("jobs").delete().eq("id", id);
+                  if (error) return toast.error(error.message);
+                  qc.invalidateQueries({ queryKey: ["jobs"] });
+                  navigate({ to: "/baustellen" });
+                }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />Auftrag löschen
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      <header className="space-y-3">
+        <div>
           {service ? (
-            <span className="rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-warning/15 text-foreground">{JOB_TYPE_LABEL.service}</span>
+            <div className="mb-1 flex items-center gap-1.5">
+              <span className="rounded-md bg-warning/15 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-foreground">{JOB_TYPE_LABEL.service}</span>
+              <StatusBadge status={displayServiceStatus(j.status)} />
+            </div>
           ) : (
-            <span className="truncate text-sm text-muted-foreground">
-              {c ? <Link to="/kunden/$id" params={{ id: c.id }} className="text-primary">{customerName(c)}</Link> : "Ohne Kunde"}
-            </span>
+            <p className="text-sm text-muted-foreground">
+              {c ? <Link to="/kunden/$id" params={{ id: c.id }} className="font-medium text-primary">{customerName(c)}</Link> : "Ohne Kunde"}
+            </p>
           )}
-          <div className="flex shrink-0 items-center gap-1">
-            {!service && <span className="rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-primary/[0.08] text-primary">{JOB_TYPE_LABEL.project}</span>}
-            <StatusBadge status={service ? displayServiceStatus(j.status) : persisted} />
-            {isActiveJob(j) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" aria-label="Weitere Aktionen" className="flex h-9 w-9 items-center justify-center rounded-lg border text-muted-foreground">
-                    <MoreHorizontal className="h-5 w-5" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="text-destructive" onClick={() => setCancelOpen(true)}>
-                    {service ? "Auftrag absagen" : "Projekt absagen"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={async () => {
-                      if (!confirm("Auftrag inkl. aller Fotos, Notizen und Positionen löschen?")) return;
-                      const { error } = await supabase.from("jobs").delete().eq("id", id);
-                      if (error) return toast.error(error.message);
-                      qc.invalidateQueries({ queryKey: ["jobs"] });
-                      navigate({ to: "/baustellen" });
-                    }}
-                  >
-                    Auftrag löschen
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <h1 className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight">{j.title}</h1>
+        </div>
+        {!service && (mapsUrl || c?.phone) && (
+          <div className="flex flex-wrap gap-2">
+            {mapsUrl && (
+              <a href={mapsUrl} className="flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm active:bg-muted">
+                <MapPin className="h-4 w-4 shrink-0 text-primary" /> <span className="truncate">{address(j)}</span>
+              </a>
+            )}
+            {c?.phone && (
+              <a href={`tel:${c.phone}`} className="flex h-9 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-sm active:bg-muted">
+                <Phone className="h-4 w-4 text-primary" /> Anrufen
+              </a>
             )}
           </div>
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold leading-tight">{j.title}</h1>
-          {!service && address(j) && (
-            <a href={`https://maps.apple.com/?q=${encodeURIComponent(address(j))}`} className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" /> {address(j)}
-            </a>
-          )}
-          {!service && c?.phone && (
-            <a href={`tel:${c.phone}`} className="mt-1 flex items-center gap-1 text-sm font-medium text-primary"><Phone className="h-4 w-4" /> {c.phone}</a>
-          )}
-        </div>
+        )}
         {!service && (
           <StatusStepper
             type={j.job_type}
@@ -208,7 +219,7 @@ function JobPage() {
         )}
         {!service && j.appointment_at && <p className="text-sm text-muted-foreground">Termin {formatDate(j.appointment_at, true)}</p>}
         {!service && j.internal_notes && <p className="rounded-lg bg-muted px-3 py-2 text-sm"><span className="font-semibold">Intern: </span>{j.internal_notes}</p>}
-      </div>
+      </header>
       {files.inputs}
       {capture.sheets}
       <PhotoAssignSheet key={assignPhotoIds.join(",")} jobId={id} photoIds={assignPhotoIds} onClose={() => setAssignPhotoIds([])} />
@@ -378,12 +389,17 @@ function ProjectStepContent({
   switch (step) {
     case "Begehung":
       return (
-        <div className="space-y-6">
-          <div className="space-y-2">{captureTiles}</div>
-          <PhotoGallery jobId={jobId} />
-          <DocumentList jobId={jobId} />
-          <NotesList jobId={jobId} />
-          <Button className="h-14 w-full text-base font-semibold" onClick={onGoEstimate}>Weiter zu Grobkosten</Button>
+        <div className="space-y-5 pb-16">
+          {captureTiles}
+          <CaptureSummary jobId={jobId} />
+          <NotesList jobId={jobId} hideEmpty />
+          <PhotoGallery jobId={jobId} hideEmpty />
+          <DocumentList jobId={jobId} hideEmpty />
+          <div className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl">
+            <Button className="h-13 w-full rounded-xl text-base font-semibold" style={{ boxShadow: "var(--shadow-float)" }} onClick={onGoEstimate}>
+              Weiter zu Grobkosten <ChevronRight className="ml-1 h-5 w-5" />
+            </Button>
+          </div>
         </div>
       );
     case "Analyse":
@@ -501,12 +517,26 @@ function CompletionChecklist({ jobId, onComplete }: { jobId: string; onComplete:
   );
 }
 
-function SecBtn({ onClick, icon, children }: { onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+function CaptureBtn({ onClick, icon, children, primary }: { onClick: () => void; icon: React.ReactNode; children: React.ReactNode; primary?: boolean }) {
   return (
-    <button onClick={onClick} className="flex h-12 items-center justify-center gap-1.5 rounded-lg border bg-card px-2 text-xs font-semibold text-foreground">
-      <span className="text-primary">{icon}</span>{children}
+    <button
+      onClick={onClick}
+      className={`flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl text-sm font-medium transition-opacity active:opacity-80 ${primary ? "bg-primary text-primary-foreground" : "border border-border bg-muted/50 text-foreground"}`}
+      style={primary ? { boxShadow: "var(--shadow-primary)" } : undefined}
+    >
+      <span className={primary ? "" : "text-primary"}>{icon}</span>{children}
     </button>
   );
+}
+
+/** Single empty hint when nothing has been captured; reads the lists' cached queries. */
+function CaptureSummary({ jobId }: { jobId: string }) {
+  const photos = useQuery<unknown[]>({ queryKey: ["photos", jobId], enabled: false });
+  const notes = useQuery<unknown[]>({ queryKey: ["notes", jobId], enabled: false });
+  const docs = useQuery<unknown[]>({ queryKey: ["documents", jobId], enabled: false });
+  if (!photos.data || !notes.data || !docs.data) return null;
+  if (photos.data.length + notes.data.length + docs.data.length > 0) return null;
+  return <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">Noch nichts erfasst. Starte mit Sprache, Foto oder Text.</p>;
 }
 
 function JobDetails({ job, onDeleted }: { job: { id: string; title: string; street: string | null; zip: string | null; city: string | null; notes: string | null; internal_notes: string | null }; onDeleted: () => void }) {
