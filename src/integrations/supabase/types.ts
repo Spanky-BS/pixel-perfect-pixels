@@ -1075,7 +1075,9 @@ export type Database = {
           default_hourly_rate: number
           default_material_markup: number
           default_technician: string
+          estimate_small_material_pct: number
           estimate_tolerance: number
+          estimate_vehicle_per_day: number
           service_hourly_rate: number
           small_material_allowance: number
           technician_city: string | null
@@ -1097,7 +1099,9 @@ export type Database = {
           default_hourly_rate?: number
           default_material_markup?: number
           default_technician?: string
+          estimate_small_material_pct?: number
           estimate_tolerance?: number
+          estimate_vehicle_per_day?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
@@ -1119,7 +1123,9 @@ export type Database = {
           default_hourly_rate?: number
           default_material_markup?: number
           default_technician?: string
+          estimate_small_material_pct?: number
           estimate_tolerance?: number
+          estimate_vehicle_per_day?: number
           service_hourly_rate?: number
           small_material_allowance?: number
           technician_city?: string | null
