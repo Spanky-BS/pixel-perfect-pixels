@@ -405,11 +405,7 @@ function ProjectStepContent({
     case "Analyse":
     case "Grobkosten":
       return (
-        <div className="space-y-4">
-          <h2 className="section-title">Grobkostenschätzung</h2>
-          <OpenQuestions jobId={jobId} />
-          <CostEstimate jobId={jobId} onWantsOffer={onWantsOffer} onDeclined={onDeclined} />
-        </div>
+        <CostEstimate jobId={jobId} onWantsOffer={onWantsOffer} onDeclined={onDeclined} questions={<OpenQuestions jobId={jobId} />} />
       );
     case "Produktauswahl":
     case "Kalkulation":
