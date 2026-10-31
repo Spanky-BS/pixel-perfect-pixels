@@ -178,7 +178,8 @@ function OpenRow({ q, onAnswer, onStatus }: { q: { text: string }; onAnswer: (a:
       {answering ? (
         <div className="mt-2 flex gap-2">
           <Input autoFocus className="h-10 text-[15px]" value={a} onChange={(e) => setA(e.target.value)} placeholder="Antwort, z.B. Rohr 16 mm"
-            onKeyDown={(e) => { if (e.key === "Enter") onAnswer(a); if (e.key === "Escape") setAnswering(false); }} />
+            onBlur={() => { if (!a.trim()) { setA(""); setAnswering(false); } }}
+            onKeyDown={(e) => { if (e.key === "Enter" && a.trim()) onAnswer(a); if (e.key === "Escape") setAnswering(false); }} />
           <button disabled={!a.trim()} onClick={() => onAnswer(a)} className="h-10 shrink-0 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-40">Speichern</button>
         </div>
       ) : (

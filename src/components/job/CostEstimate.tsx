@@ -121,8 +121,17 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined, questions }: { j
       <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground" style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-primary)" }}>
         <div className="p-5 pb-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Geschätzte Kosten · exkl. MWST</div>
-          <div className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular">{formatCHF(roundTo(total))}</div>
-          <div className="mt-2 text-sm opacity-80 tabular">{formatCHF(roundTo(total * (1 - tol / 100)))} – {formatCHF(roundTo(total * (1 + tol / 100)))}</div>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            <div>
+              <div className="text-xs opacity-70">von</div>
+              <div className="text-[26px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 - tol / 100)))}</div>
+            </div>
+            <div>
+              <div className="text-xs opacity-70">bis</div>
+              <div className="text-[26px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 + tol / 100)))}</div>
+            </div>
+          </div>
+          <div className="mt-2 text-sm opacity-80 tabular">Mittelwert {formatCHF(roundTo(total))} · Summe der Rubriken</div>
         </div>
         <div className="flex items-center justify-between border-t border-primary-foreground/15 px-5 py-2.5">
           <span className="text-sm opacity-80">Toleranz</span>
