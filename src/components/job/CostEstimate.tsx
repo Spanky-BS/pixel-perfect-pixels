@@ -124,11 +124,11 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined, questions }: { j
           <div className="mt-2 grid grid-cols-2 gap-3">
             <div>
               <div className="text-xs opacity-70">von</div>
-              <div className="text-[26px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 - tol / 100)))}</div>
+              <div className="text-[24px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 - tol / 100))).replace(/\.00$/, "")}</div>
             </div>
             <div>
               <div className="text-xs opacity-70">bis</div>
-              <div className="text-[26px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 + tol / 100)))}</div>
+              <div className="text-[24px] font-semibold leading-tight tracking-tight tabular">{formatCHF(roundTo(total * (1 + tol / 100))).replace(/\.00$/, "")}</div>
             </div>
           </div>
           <div className="mt-2 text-sm opacity-80 tabular">Mittelwert {formatCHF(roundTo(total))} · Summe der Rubriken</div>
