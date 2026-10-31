@@ -10,6 +10,7 @@ import { Field } from "@/components/CustomerForm";
 import { PageHeader } from "@/components/Brand";
 import { IconBtn } from "@/components/job/MaterialList";
 import { categoriesQuery, productsQuery, settingsQuery } from "@/lib/queries";
+import { ibanStatus, normalizeIBAN } from "@/lib/customer-invoice";
 import { formatCHF, requireUserId, signedUrls, uploadProfileMedia, BUCKET } from "@/lib/app";
 import { matchesProduct, type Product } from "@/lib/products";
 import { ProductEditor, type ProductDraft } from "@/components/job/ProductEditor";
@@ -51,6 +52,10 @@ function SettingsPage() {
     technician_street: "",
     technician_zip: "",
     technician_city: "",
+    iban: "",
+    invoice_payment_days: 30,
+    akonto_payment_days: 14,
+    offer_valid_days: 30,
   });
 
   useEffect(() => {
@@ -73,6 +78,10 @@ function SettingsPage() {
       technician_street: settings.data.technician_street ?? "",
       technician_zip: settings.data.technician_zip ?? "",
       technician_city: settings.data.technician_city ?? "",
+      iban: settings.data.iban ?? "",
+      invoice_payment_days: Number(settings.data.invoice_payment_days ?? 30),
+      akonto_payment_days: Number(settings.data.akonto_payment_days ?? 14),
+      offer_valid_days: Number(settings.data.offer_valid_days ?? 30),
     });
   }, [settings.data]);
 
@@ -86,6 +95,10 @@ function SettingsPage() {
       estimate_tolerance: s.estimate_tolerance,
       estimate_vehicle_per_day: s.estimate_vehicle_per_day,
       estimate_small_material_pct: s.estimate_small_material_pct,
+      iban: normalizeIBAN(s.iban) || null,
+      invoice_payment_days: s.invoice_payment_days,
+      akonto_payment_days: s.akonto_payment_days,
+      offer_valid_days: s.offer_valid_days,
       currency: "CHF",
     });
     if (error) return toast.error(error.message);
@@ -120,6 +133,20 @@ function SettingsPage() {
           <Field label="Materialzuschlag %"><Input className="h-12 text-base" type="number" inputMode="decimal" value={s.default_material_markup} onChange={(e) => setS({ ...s, default_material_markup: Number(e.target.value) })} /></Field>
         </div>
         <Button className="h-12 w-full font-medium" onClick={saveCompany}>Preise speichern</Button>
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-border/70 bg-card p-4">
+        <h2 className="section-title">Offerte & Rechnung</h2>
+        <Field label="IBAN Geschäftskonto (für QR-Einzahlungsschein)">
+          <Input className="h-12 text-base tabular" value={s.iban} onChange={(e) => setS({ ...s, iban: e.target.value })} placeholder="CH00 0000 0000 0000 0000 0" autoCapitalize="characters" />
+        </Field>
+        {s.iban.trim() && ibanStatus(s.iban) === "invalid" && <p className="-mt-2 text-sm text-destructive">IBAN ungültig – bitte prüfen.</p>}
+        <div className="grid grid-cols-3 gap-3">
+          <Field label="Rechnung Tage"><Input className="h-12 text-base" type="number" inputMode="numeric" value={s.invoice_payment_days} onChange={(e) => setS({ ...s, invoice_payment_days: Number(e.target.value) })} /></Field>
+          <Field label="Akonto Tage"><Input className="h-12 text-base" type="number" inputMode="numeric" value={s.akonto_payment_days} onChange={(e) => setS({ ...s, akonto_payment_days: Number(e.target.value) })} /></Field>
+          <Field label="Offerte gültig"><Input className="h-12 text-base" type="number" inputMode="numeric" value={s.offer_valid_days} onChange={(e) => setS({ ...s, offer_valid_days: Number(e.target.value) })} /></Field>
+        </div>
+        <Button className="h-12 w-full font-medium" onClick={saveCompany}>Speichern</Button>
       </section>
 
       <EmployeeProfile

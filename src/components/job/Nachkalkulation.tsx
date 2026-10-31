@@ -8,6 +8,7 @@ import { useMaterials } from "./MaterialList";
 import { useLabour } from "./LabourList";
 import { useTimeEntries } from "./Ausfuehrung";
 import { Row } from "./Kalkulation";
+import { useCustomerInvoices } from "./Rechnung";
 
 function linkedProduct(row: { products?: Product | Product[] | null }): Product | null {
   const p = row.products;
@@ -56,7 +57,9 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
     else actualMaterial += r.net;
   });
 
-  const actualRevenue: number | null = null;
+  const customerInvoices = useCustomerInvoices(jobId);
+  const schluss = (customerInvoices.data ?? []).find((i) => i.kind === "schluss" && i.status !== "storniert");
+  const actualRevenue: number | null = schluss ? Number(schluss.net) : null;
   const actualLabour = hasIstLabour ? istLabourCHF : null;
   const vorlaeufigTotal = actualMaterial + (actualLabour ?? plannedLabour);
   const vorlaeufigDeck = (actualRevenue ?? plannedVk) - vorlaeufigTotal;
@@ -66,7 +69,7 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
     <section className="space-y-3 rounded-xl border bg-card p-4">
       <h2 className="section-title">Vorläufige Nachkalkulation</h2>
       <p className="text-sm text-muted-foreground">
-        SOLL aus der bestätigten Offerte. IST-Stunden aus der Ausführung. Ist-Material aus bestätigten Lieferantenrechnungen (netto). Kundenrechnung folgt ohne Bexio.
+        SOLL aus der bestätigten Offerte. IST-Stunden aus der Ausführung. Ist-Material aus bestätigten Lieferantenrechnungen (netto). Erlös aus der Schlussrechnung (netto).
       </p>
       {materialIncomplete && (
         <p className="rounded-lg border border-warning bg-warning/15 p-3 text-sm font-semibold">
@@ -78,7 +81,7 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
       <Row label="Geplanter Material-EK" value={formatCHF(plannedEk)} />
       <Row label="Geplanter Material-VK" value={formatCHF(plannedVk)} />
       <Row label="Ist-Material (netto)" value={materialIncomplete && !confirmed.length ? "–" : formatCHF(actualMaterial)} />
-      <Row label="Kundenerlös / Rechnung" value={actualRevenue == null ? "folgt (ohne Bexio)" : formatCHF(actualRevenue)} />
+      <Row label="Kundenerlös / Rechnung" value={actualRevenue == null ? "noch keine Schlussrechnung" : formatCHF(actualRevenue)} />
       <Row label="Vorläufige Kosten (Ist-Material + Arbeit)" value={formatCHF(vorlaeufigTotal)} />
       <Row label="Vorläufiger Deckungsbeitrag" value={formatCHF(vorlaeufigDeck)} />
       <Row label="Vorläufige Marge" value={vorlaeufigMarge == null ? "–" : `${vorlaeufigMarge} %`} bold />
