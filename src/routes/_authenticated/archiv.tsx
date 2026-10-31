@@ -61,7 +61,7 @@ function ArchivePage() {
       </div>
       <div className="space-y-3">
         {isLoading && <p className="text-sm text-muted-foreground">Laden…</p>}
-        {list.map((j) => <JobCard key={j.id} job={j} />)}
+        {list.length > 0 && <div className="list-group">{list.map((j) => <JobCard key={j.id} job={j} />)}</div>}
         {!isLoading && !list.length && (
           <p className="rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">Noch keine archivierten Aufträge.</p>
         )}
