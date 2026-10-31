@@ -107,7 +107,7 @@ export function qrBillData(input: {
   companyName: string;
   amount: number;
   number: string;
-  debtor?: { name: string; street?: string | null; zip?: string | null; city?: string | null } | null;
+  debtor?: { name: string; street?: string | null | undefined; zip?: string | null | undefined; city?: string | null | undefined } | null | undefined;
 }): QrBillData {
   const account = normalizeIBAN(input.iban);
   const { zip, city } = splitZipCity(COMPANY.zipCity);

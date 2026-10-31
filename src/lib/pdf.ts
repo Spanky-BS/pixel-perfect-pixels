@@ -4,7 +4,8 @@ type JsPdf = any;
 /** Client-only: renders a DOM element into a real A4 PDF file (loaded lazily). `after` can add pages (e.g. QR slip). */
 export async function elementToPdf(el: HTMLElement, filename: string, after?: (pdf: JsPdf) => Promise<void> | void): Promise<File> {
   const { default: html2pdf } = await import("html2pdf.js");
-  let worker = html2pdf()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let worker: any = html2pdf()
     .set(({
       margin: [10, 10, 12, 10],
       filename: `${filename}.pdf`,

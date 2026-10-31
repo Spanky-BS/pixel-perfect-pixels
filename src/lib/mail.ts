@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { downloadFile } from "@/lib/pdf";
 
-export type MailDraft = { to?: string | null; subject: string; body: string };
+export type MailDraft = { to?: string | null | undefined; subject: string; body: string };
 
 function shareFile(file: File, mail: MailDraft) {
   return navigator.share({ files: [file], title: mail.subject, text: mail.body });
@@ -18,7 +18,7 @@ function openMailto(mail: MailDraft) {
  * so the file only needs to be dragged in. Returns true when the user did not cancel.
  */
 export async function sendPdfByMail(file: File, mail: MailDraft): Promise<boolean> {
-  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+  if (navigator.canShare?.({ files: [file] })) {
     try {
       await shareFile(file, mail);
       return true;
