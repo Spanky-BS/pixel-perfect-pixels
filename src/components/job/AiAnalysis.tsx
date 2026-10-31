@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, X, Plus, RotateCcw } from "lucide-react";
+import { Check, X, Plus, RotateCcw, CircleHelp, MessageSquareReply } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { analyzeJob } from "@/lib/ai.functions";
@@ -134,16 +134,23 @@ export function OpenQuestions({ jobId }: { jobId: string }) {
   const done = list.filter((o) => o.status !== "offen");
   if (!list.length) return null;
   return (
-    <section className="space-y-2 rounded-2xl border border-warning/40 bg-warning/[0.08] p-4">
-      <h2 className="text-base font-semibold">Offene Fragen {open.length > 0 && <span className="ml-1 rounded bg-warning/30 px-1.5 text-sm">{open.length}</span>}</h2>
-      <p className="text-xs text-muted-foreground">Antwort eintippen, damit die KI die Schätzung verbessert – oder abhaken / verwerfen.</p>
-      {open.map((o) => <OpenRow key={o.id} q={o} onAnswer={(a) => answer(o, a)} onStatus={(st) => setStatus(o.id, st)} />)}
+    <section className="overflow-hidden rounded-xl border border-warning/50 bg-card" style={{ boxShadow: "var(--shadow-card)" }}>
+      <div className="flex items-center gap-2 border-b border-warning/30 bg-warning/[0.10] px-4 py-3">
+        <CircleHelp className="h-5 w-5 shrink-0 text-warning" strokeWidth={2} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[15px] font-semibold">{open.length ? `${open.length} offene ${open.length === 1 ? "Frage" : "Fragen"}` : "Alle Fragen erledigt"}</h2>
+          <p className="text-xs text-muted-foreground">Antworten verbessern die nächste KI-Auswertung.</p>
+        </div>
+      </div>
+      <div className="divide-y divide-border">
+        {open.map((o) => <OpenRow key={o.id} q={o} onAnswer={(a) => answer(o, a)} onStatus={(st) => setStatus(o.id, st)} />)}
+      </div>
       {done.length > 0 && (
-        <details className="pt-1">
+        <details className="border-t border-border px-4 py-2.5">
           <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{done.length} erledigt</summary>
-          <div className="mt-2 space-y-1.5">
+          <div className="mt-2 space-y-1">
             {done.map((o) => (
-              <div key={o.id} className="flex items-start justify-between gap-2 rounded-lg bg-card px-3 py-2 text-sm">
+              <div key={o.id} className="flex items-start justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
                 <div className="min-w-0">
                   <div className={o.status === "nicht relevant" ? "text-muted-foreground line-through" : ""}>{o.text}</div>
                   {o.answer && <div className="font-medium text-primary">→ {o.answer}</div>}
@@ -154,9 +161,9 @@ export function OpenQuestions({ jobId }: { jobId: string }) {
           </div>
         </details>
       )}
-      <div className="flex gap-2 pt-1">
-        <Input className="h-11 bg-card text-base" value={text} onChange={(e) => setText(e.target.value)} placeholder="Eigene Frage hinzufügen" onKeyDown={(e) => e.key === "Enter" && add()} />
-        <button onClick={add} aria-label="Hinzufügen" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground"><Plus className="h-5 w-5" /></button>
+      <div className="flex gap-2 border-t border-border p-3">
+        <Input className="h-10 bg-muted/50 text-[15px] shadow-none" value={text} onChange={(e) => setText(e.target.value)} placeholder="Eigene Frage notieren" onKeyDown={(e) => e.key === "Enter" && add()} />
+        <button onClick={add} disabled={!text.trim()} aria-label="Hinzufügen" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border text-primary disabled:opacity-40"><Plus className="h-5 w-5" /></button>
       </div>
     </section>
   );
@@ -164,18 +171,23 @@ export function OpenQuestions({ jobId }: { jobId: string }) {
 
 function OpenRow({ q, onAnswer, onStatus }: { q: { text: string }; onAnswer: (a: string) => void; onStatus: (s: string) => void }) {
   const [a, setA] = useState("");
+  const [answering, setAnswering] = useState(false);
   return (
-    <div className="space-y-2 rounded-xl border bg-card p-3">
-      <div className="font-medium">{q.text}</div>
-      <div className="flex gap-2">
-        <Input className="h-11 text-base" value={a} onChange={(e) => setA(e.target.value)} placeholder="Antwort, z.B. Rohr 16 mm" onKeyDown={(e) => e.key === "Enter" && onAnswer(a)} />
-        <button disabled={!a.trim()} onClick={() => onAnswer(a)} className="h-11 shrink-0 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-40">Speichern</button>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => onStatus("geklärt")} className="flex h-10 items-center justify-center gap-1 rounded-lg border text-sm font-semibold"><Check className="h-4 w-4" />Abhaken</button>
-        <button onClick={() => onStatus("nicht relevant")} className="flex h-10 items-center justify-center gap-1 rounded-lg border text-sm font-semibold text-muted-foreground"><X className="h-4 w-4" />Verwerfen</button>
-      </div>
+    <div className="px-4 py-3">
+      <p className="text-[15px] leading-snug">{q.text}</p>
+      {answering ? (
+        <div className="mt-2 flex gap-2">
+          <Input autoFocus className="h-10 text-[15px]" value={a} onChange={(e) => setA(e.target.value)} placeholder="Antwort, z.B. Rohr 16 mm"
+            onKeyDown={(e) => { if (e.key === "Enter") onAnswer(a); if (e.key === "Escape") setAnswering(false); }} />
+          <button disabled={!a.trim()} onClick={() => onAnswer(a)} className="h-10 shrink-0 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-40">Speichern</button>
+        </div>
+      ) : (
+        <div className="mt-2 flex gap-1.5">
+          <button onClick={() => setAnswering(true)} className="flex h-9 items-center gap-1.5 rounded-full bg-primary/[0.08] px-3 text-sm font-medium text-primary"><MessageSquareReply className="h-4 w-4" />Antworten</button>
+          <button onClick={() => onStatus("geklärt")} className="flex h-9 items-center gap-1 rounded-full border border-border px-3 text-sm font-medium"><Check className="h-4 w-4" />Erledigt</button>
+          <button onClick={() => onStatus("nicht relevant")} aria-label="Verwerfen" className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground"><X className="h-4 w-4" /></button>
+        </div>
+      )}
     </div>
   );
 }
-
