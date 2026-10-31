@@ -30,42 +30,33 @@ export function StatusStepper({
   }, [viewIdx]);
 
   return (
-    <div className="space-y-3 border-t border-border/60 pt-4">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>Schritt {viewIdx + 1} von {steps.length}</span>
-        <span className="font-medium text-foreground">{stepLabel(type, steps[viewIdx] ?? view)}</span>
-      </div>
-      <div className="flex gap-1">
-        {steps.map((s, i) => (
-          <div key={s} className={`h-1.5 flex-1 rounded-full ${i <= persistedIdx ? "bg-primary" : "bg-muted"}`} />
-        ))}
-      </div>
-      <div ref={ref} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+    <nav aria-label="Projektphasen" className="surface p-1">
+      <div ref={ref} className="flex overflow-x-auto [scrollbar-width:none]">
         {steps.map((s, i) => {
           const done = i < persistedIdx;
-          const viewing = i === viewIdx;
           const current = i === persistedIdx;
-          const activeStyle = current && viewing
-            ? "bg-primary text-primary-foreground"
-            : viewing
-              ? "bg-card text-primary ring-1 ring-primary"
-              : done
-                ? "bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground";
+          const viewing = i === viewIdx;
           return (
             <button
               key={s}
               type="button"
               data-step={i}
+              aria-current={viewing ? "step" : undefined}
               onClick={() => onSelect(s)}
-              className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors ${activeStyle}`}
+              className={`flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors ${viewing ? "bg-primary/[0.08] text-primary" : done ? "text-foreground" : "text-muted-foreground"}`}
             >
-              {done && !viewing ? <Check className="h-4 w-4" /> : <span className="text-xs opacity-70">{i + 1}</span>}
+              <span
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular ${
+                  done ? "bg-primary text-primary-foreground" : current ? "bg-primary text-primary-foreground ring-4 ring-primary/15" : "border border-border text-muted-foreground"
+                }`}
+              >
+                {done ? <Check className="h-3 w-3" strokeWidth={3} /> : i + 1}
+              </span>
               {stepLabel(type, s)}
             </button>
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }

@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Camera, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft, MoreHorizontal, FileUp } from "lucide-react";
+import { Camera, Mic, FileText, Package, Wrench, MapPin, Phone, Trash2, ChevronLeft, ChevronRight, MoreHorizontal, FileUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { computeQuote } from "@/lib/project-quote";
 import { StatusBadge } from "@/components/Brand";
 import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
 import { unitSalesPrice } from "@/lib/products";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/_authenticated/baustellen/$id")({
   head: () => ({
@@ -36,6 +36,8 @@ export const Route = createFileRoute("/_authenticated/baustellen/$id")({
       { name: "description", content: "Baustelle mit Fotos, Notizen, Material und Arbeitsleistungen." },
       { property: "og:title", content: "Auftrag – Haustechnik Nordwestschweiz" },
       { property: "og:description", content: "Baustelle mit Fotos, Notizen, Material und Arbeitsleistungen." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: JobPage,
