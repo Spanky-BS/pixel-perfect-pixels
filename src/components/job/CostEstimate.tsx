@@ -128,7 +128,9 @@ export function CostEstimate({ jobId, onWantsOffer, onDeclined, questions }: { j
           <span className="text-sm opacity-80">Toleranz</span>
           <div className="flex items-center gap-1">
             <button aria-label="Toleranz verringern" onClick={() => saveTol(tol - 5)} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/10 active:bg-primary-foreground/20"><Minus className="h-4 w-4" /></button>
-            <span className="w-14 text-center text-base font-semibold tabular">±{tol}%</span>
+            <label className="flex w-16 items-center justify-center text-base font-semibold tabular">±<input aria-label="Toleranz in Prozent" type="number" inputMode="numeric" value={tol}
+              onChange={(e) => setTolDraft(e.target.value === "" ? 0 : Number(e.target.value))} onBlur={() => tolDraft !== null && saveTol(tolDraft)}
+              className="w-8 bg-transparent text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />%</label>
             <button aria-label="Toleranz erhöhen" onClick={() => saveTol(tol + 5)} className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-foreground/10 active:bg-primary-foreground/20"><Plus className="h-4 w-4" /></button>
           </div>
         </div>
