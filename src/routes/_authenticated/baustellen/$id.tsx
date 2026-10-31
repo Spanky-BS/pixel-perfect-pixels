@@ -387,12 +387,17 @@ function ProjectStepContent({
   switch (step) {
     case "Begehung":
       return (
-        <div className="space-y-6">
-          <div className="space-y-2">{captureTiles}</div>
-          <PhotoGallery jobId={jobId} />
-          <DocumentList jobId={jobId} />
-          <NotesList jobId={jobId} />
-          <Button className="h-14 w-full text-base font-semibold" onClick={onGoEstimate}>Weiter zu Grobkosten</Button>
+        <div className="space-y-5 pb-16">
+          {captureTiles}
+          <CaptureSummary jobId={jobId} />
+          <NotesList jobId={jobId} hideEmpty />
+          <PhotoGallery jobId={jobId} hideEmpty />
+          <DocumentList jobId={jobId} hideEmpty />
+          <div className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-20 mx-auto max-w-2xl">
+            <Button className="h-13 w-full rounded-xl text-base font-semibold" style={{ boxShadow: "var(--shadow-float)" }} onClick={onGoEstimate}>
+              Weiter zu Grobkosten <ChevronRight className="ml-1 h-5 w-5" />
+            </Button>
+          </div>
         </div>
       );
     case "Analyse":
@@ -510,11 +515,36 @@ function CompletionChecklist({ jobId, onComplete }: { jobId: string; onComplete:
   );
 }
 
-function SecBtn({ onClick, icon, children }: { onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+function CaptureBtn({ onClick, icon, children, primary }: { onClick: () => void; icon: React.ReactNode; children: React.ReactNode; primary?: boolean }) {
   return (
-    <button onClick={onClick} className="flex h-12 items-center justify-center gap-1.5 rounded-lg border bg-card px-2 text-xs font-semibold text-foreground">
-      <span className="text-primary">{icon}</span>{children}
+    <button
+      onClick={onClick}
+      className={`flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl text-sm font-medium transition-opacity active:opacity-80 ${primary ? "bg-primary text-primary-foreground" : "border border-border bg-muted/50 text-foreground"}`}
+      style={primary ? { boxShadow: "var(--shadow-primary)" } : undefined}
+    >
+      <span className={primary ? "" : "text-primary"}>{icon}</span>{children}
     </button>
+  );
+}
+
+/** One-line overview of what was captured; reads the lists' cached queries. */
+function CaptureSummary({ jobId }: { jobId: string }) {
+  const photos = useQuery<unknown[]>({ queryKey: ["photos", jobId], enabled: false });
+  const notes = useQuery<{ kind?: string }[]>({ queryKey: ["notes", jobId], enabled: false });
+  const docs = useQuery<unknown[]>({ queryKey: ["documents", jobId], enabled: false });
+  const p = photos.data?.length ?? 0;
+  const v = (notes.data ?? []).filter((n) => n.kind === "voice").length;
+  const t = (notes.data?.length ?? 0) - v;
+  const d = docs.data?.length ?? 0;
+  const items = [[p, "Fotos", "Foto"], [v, "Sprachnotizen", "Sprachnotiz"], [t, "Textnotizen", "Textnotiz"], [d, "Unterlagen", "Unterlage"]] as const;
+  const empty = p + v + t + d === 0;
+  if (empty) {
+    return <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">Noch nichts erfasst. Starte mit Sprache, Foto oder Text.</p>;
+  }
+  return (
+    <p className="px-1 text-sm text-muted-foreground tabular">
+      {items.filter(([n]) => n > 0).map(([n, pl, sg]) => `${n} ${n === 1 ? sg : pl}`).join(" · ")}
+    </p>
   );
 }
 
