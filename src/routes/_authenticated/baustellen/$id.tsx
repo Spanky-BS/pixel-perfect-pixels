@@ -529,25 +529,14 @@ function CaptureBtn({ onClick, icon, children, primary }: { onClick: () => void;
   );
 }
 
-/** One-line overview of what was captured; reads the lists' cached queries. */
+/** Single empty hint when nothing has been captured; reads the lists' cached queries. */
 function CaptureSummary({ jobId }: { jobId: string }) {
   const photos = useQuery<unknown[]>({ queryKey: ["photos", jobId], enabled: false });
-  const notes = useQuery<{ kind?: string }[]>({ queryKey: ["notes", jobId], enabled: false });
+  const notes = useQuery<unknown[]>({ queryKey: ["notes", jobId], enabled: false });
   const docs = useQuery<unknown[]>({ queryKey: ["documents", jobId], enabled: false });
-  const p = photos.data?.length ?? 0;
-  const v = (notes.data ?? []).filter((n) => n.kind === "voice").length;
-  const t = (notes.data?.length ?? 0) - v;
-  const d = docs.data?.length ?? 0;
-  const items = [[p, "Fotos", "Foto"], [v, "Sprachnotizen", "Sprachnotiz"], [t, "Textnotizen", "Textnotiz"], [d, "Unterlagen", "Unterlage"]] as const;
-  const empty = p + v + t + d === 0;
-  if (empty) {
-    return <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">Noch nichts erfasst. Starte mit Sprache, Foto oder Text.</p>;
-  }
-  return (
-    <p className="px-1 text-sm text-muted-foreground tabular">
-      {items.filter(([n]) => n > 0).map(([n, pl, sg]) => `${n} ${n === 1 ? sg : pl}`).join(" · ")}
-    </p>
-  );
+  if (!photos.data || !notes.data || !docs.data) return null;
+  if (photos.data.length + notes.data.length + docs.data.length > 0) return null;
+  return <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">Noch nichts erfasst. Starte mit Sprache, Foto oder Text.</p>;
 }
 
 function JobDetails({ job, onDeleted }: { job: { id: string; title: string; street: string | null; zip: string | null; city: string | null; notes: string | null; internal_notes: string | null }; onDeleted: () => void }) {
