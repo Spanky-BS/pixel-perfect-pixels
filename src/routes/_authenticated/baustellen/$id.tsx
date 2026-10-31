@@ -22,7 +22,8 @@ import { SupplierInvoices } from "@/components/job/SupplierInvoices";
 import { ServiceJobView } from "@/components/job/ServiceJob";
 import { OfferteWorkspace, QuoteTotalsCard } from "@/components/job/Offerte";
 import { AusfuehrungWorkspace } from "@/components/job/Ausfuehrung";
-import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Job, type Labour, type Material } from "@/lib/app";
+import { RechnungWorkspace, useCustomerInvoices } from "@/components/job/Rechnung";
+import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Customer, type Job, type Labour, type Material } from "@/lib/app";
 import { computeQuote } from "@/lib/project-quote";
 import { StatusBadge } from "@/components/Brand";
 import { cancelJob, completeJob, isActiveJob, lifecycleLabel, lifecycleOf } from "@/lib/lifecycle";
@@ -281,6 +282,7 @@ function JobPage() {
             toast.success("Kunde will Offerte – weiter mit der Offerte");
           }}
           onDeclined={() => { setCancelReason("Kunde hat nach Grobkosten abgesagt"); setCancelOpen(true); }}
+          onDeclinedOffer={() => { setCancelReason("Offerte abgelehnt"); setCancelOpen(true); }}
         />
       )}
 
@@ -296,14 +298,14 @@ function JobPage() {
         />
       )}
 
-      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "none"} draft={mat} onClose={() => {
+      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "mat-none"} draft={mat} onClose={() => {
         setMat(null);
         if (!service && viewStep === "Offerte") void (async () => {
           const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
           if (curIdx >= 0 && curIdx < PROJECT_STEPS.indexOf("Offerte")) await setStatus("Offerte");
         })();
       }} />
-      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "none"} draft={lab} onClose={() => {
+      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "lab-none"} draft={lab} onClose={() => {
         setLab(null);
         if (!service && viewStep === "Offerte") void (async () => {
           const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
@@ -366,9 +368,10 @@ function ProjectStepContent({
   onGoEstimate,
   onWantsOffer,
   onDeclined,
+  onDeclinedOffer,
 }: {
   step: string;
-  job: Job & { customers?: { id: string; company_name: string | null; first_name: string | null; last_name: string | null } | null };
+  job: Job & { customers?: (Partial<Customer> & { id: string; company_name: string | null; first_name: string | null; last_name: string | null }) | null };
   jobId: string;
   captureTiles: React.ReactNode;
   onAddMaterial: () => void;
@@ -385,6 +388,7 @@ function ProjectStepContent({
   onGoEstimate: () => void;
   onWantsOffer: () => void;
   onDeclined: () => void;
+  onDeclinedOffer: () => void;
 }) {
   switch (step) {
     case "Begehung":
@@ -418,6 +422,7 @@ function ProjectStepContent({
           onEditMaterial={onEditMaterial}
           onViewSources={onViewSources}
           onConfirmed={() => void onConfirmOffer()}
+          onDeclined={onDeclinedOffer}
           onTouchOfferte={onTouchOfferte}
         />
       );
@@ -432,7 +437,7 @@ function ProjectStepContent({
         />
       );
     case "Rechnung":
-      return <AbrechnungPlaceholder jobId={jobId} />;
+      return <AbrechnungStep job={job} />;
     case "Abgeschlossen":
       return (
         <div className="space-y-4">
@@ -460,19 +465,13 @@ function ProjectStepContent({
   }
 }
 
-function AbrechnungPlaceholder({ jobId }: { jobId: string }) {
+function AbrechnungStep({ job }: { job: Job & { customers?: Partial<Customer> | null } }) {
   return (
     <div className="space-y-4">
-      <QuoteTotalsCard jobId={jobId} />
-      <section className="space-y-2 rounded-xl border bg-card p-4">
-        <h2 className="section-title">Kundenrechnung</h2>
-        <p className="text-sm text-muted-foreground">SOLL aus der bestätigten Offerte, IST aus der Ausführung. Rechnung an den Kunden folgt (ohne Bexio).</p>
-        <button disabled className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border font-semibold text-muted-foreground opacity-70">
-          <FileText className="h-4 w-4" /> Rechnung in Bexio erstellen (folgt)
-        </button>
-      </section>
-      <SupplierInvoices jobId={jobId} />
-      <Nachkalkulation jobId={jobId} />
+      <RechnungWorkspace job={job} />
+      <QuoteTotalsCard jobId={job.id} />
+      <SupplierInvoices jobId={job.id} />
+      <Nachkalkulation jobId={job.id} />
     </div>
   );
 }
@@ -495,11 +494,13 @@ function CompletionChecklist({ jobId, onComplete }: { jobId: string; onComplete:
     return !p || unitSalesPrice(p) == null;
   }).length;
   const noLabour = !(labour.data ?? []).length;
+  const invoices = useCustomerInvoices(jobId);
+  const hasSchluss = (invoices.data ?? []).some((i) => i.kind === "schluss" && i.status !== "storniert");
   const warnings = [
     openCount ? `${openCount} offene Punkte vorhanden` : null,
     unpriced ? `${unpriced} Materialpositionen ohne Preis` : null,
     noLabour ? "Keine Arbeitszeiten erfasst" : null,
-    "Abrechnung / Rechnung noch nicht in Bexio (folgt)",
+    hasSchluss ? null : "Noch keine Schlussrechnung erstellt",
   ].filter(Boolean) as string[];
   return (
     <section className="space-y-3 rounded-xl border bg-card p-4">
