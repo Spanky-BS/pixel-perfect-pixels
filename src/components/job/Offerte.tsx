@@ -26,6 +26,7 @@ import {
 } from "@/lib/app";
 import { computeQuote, labourQuoteAmount, linkedProduct, quotedLabour } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
+import { round5 } from "@/lib/customer-invoice";
 
 const seedingJobs = new Set<string>();
 
@@ -110,7 +111,7 @@ export function OfferteWorkspace({
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Offerte · inkl. MWST</span>
             <span className="text-[11px] font-medium opacity-70 tabular">{offerNumber(job)}</span>
           </div>
-          <div className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular">{formatCHF(totals.total)}</div>
+          <div className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular">{formatCHF(round5(totals.total))}</div>
           <div className="mt-2 text-sm opacity-80 tabular">Netto {formatCHF(totals.subtotal)} · MWST {vatRate}% {formatCHF(totals.vat)}</div>
         </div>
         <div className="flex items-center justify-between border-t border-primary-foreground/15 px-5 py-2.5 text-sm">
@@ -209,7 +210,7 @@ export function OfferteWorkspace({
         totals={totals}
         settings={settings.data}
         onSent={async () => {
-          await supabase.from("quotations").insert({ job_id: jobId, status: "Versendet", total: totals.total });
+          await supabase.from("quotations").insert({ job_id: jobId, status: "Versendet", total: round5(totals.total) });
           qc.invalidateQueries({ queryKey: ["quotations", jobId] });
         }}
       />
@@ -263,6 +264,7 @@ function OffertePdfActions({
   const filename = `Offerte_${nr}_${(job.title || "Projekt").replace(/[^\w\-äöüÄÖÜ]+/g, "_")}`;
   const contact = c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "";
   const custLines = c ? [c.company_name, contact, c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
+  const printed = quoted.filter((l) => labourQuoteAmount(l) > 0);
 
   async function run(mode: "download" | "mail") {
     if (!ref.current) return;
@@ -330,13 +332,13 @@ function OffertePdfActions({
               </dl>
             </div>
           </div>
-          {quoted.length > 0 && (
+          {printed.length > 0 && (
             <section className="sr-sec">
               <h3>Arbeiten</h3>
               <table className="sr-table">
                 <thead><tr><th>Beschreibung</th><th className="num">Stunden</th><th className="num">Ansatz</th><th className="num">Betrag</th></tr></thead>
                 <tbody>
-                  {quoted.map((l) => (
+                  {printed.map((l) => (
                     <tr key={l.id}>
                       <td>{l.description || "–"}{l.notes?.trim() ? <><br /><small>{l.notes}</small></> : null}</td>
                       <td className="num">{Number(l.hours).toLocaleString("de-CH")}</td>
@@ -378,7 +380,7 @@ function OffertePdfActions({
             <table><tbody>
               <tr><td>Zwischensumme netto:</td><td className="num">{formatCHF(totals.subtotal)}</td></tr>
               <tr><td>MWST {vatRate}%:</td><td className="num">{formatCHF(totals.vat)}</td></tr>
-              <tr className="grand"><td>Totalbetrag inkl. MWST:</td><td className="num">{formatCHF(totals.total)}</td></tr>
+              <tr className="grand"><td>Totalbetrag inkl. MWST:</td><td className="num">{formatCHF(round5(totals.total))}</td></tr>
             </tbody></table>
           </div>
           <p style={{ marginTop: 14 }}>Wir danken für Ihre Anfrage und freuen uns auf Ihren Auftrag. Preise in CHF. Verrechnet wird nach effektivem Aufwand. Die Offerte ist {validDays} Tage gültig.</p>

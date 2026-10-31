@@ -298,14 +298,14 @@ function JobPage() {
         />
       )}
 
-      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "none"} draft={mat} onClose={() => {
+      <MaterialEditor key={mat ? (mat.id ?? "new" + (mat.description ?? "")) : "mat-none"} draft={mat} onClose={() => {
         setMat(null);
         if (!service && viewStep === "Offerte") void (async () => {
           const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
           if (curIdx >= 0 && curIdx < PROJECT_STEPS.indexOf("Offerte")) await setStatus("Offerte");
         })();
       }} />
-      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "none"} draft={lab} onClose={() => {
+      <LabourEditor key={lab ? (lab.id ?? "new" + (lab.description ?? "")) : "lab-none"} draft={lab} onClose={() => {
         setLab(null);
         if (!service && viewStep === "Offerte") void (async () => {
           const curIdx = PROJECT_STEPS.indexOf(persisted as (typeof PROJECT_STEPS)[number]);
