@@ -14,7 +14,10 @@
 - Signed-in pages live under `src/routes/_authenticated/` (client-only gate); data is read/written from the browser client with RLS, except AI analysis, which runs in a server function (`src/lib/ai.functions.ts`) so the AI key stays server-side.
 - Photos and voice audio go in the private `job-media` bucket under `<user_id>/<job_id>/`, shown via signed URLs.
 - New users get settings + default material categories from the `handle_new_user` trigger.
-- Supplier/quotation/Bexio tables exist as structure only; no integration code until that phase.
+- Supplier/Bexio tables exist as structure only; no integration code until that phase.
+- Customer invoices (`customer_invoices`) store their lines as a JSON snapshot so a sent PDF never changes; amounts/numbering/QR data live in `src/lib/customer-invoice.ts` (pure, tested).
+- PDFs are rendered client-side with html2pdf.js; `html2canvas` is overridden to `html2canvas-pro` in package.json because Tailwind v4 oklch colours make plain html2canvas hang.
+- Sending documents goes through `sendPdfByMail` (`src/lib/mail.ts`): native share with the PDF attached, else download + prefilled mailto, so a later mail provider can replace one function.
 
 - Jobs have `job_type` (project|service); status steps per type live in `src/lib/app.ts` (`stepsFor`), legacy project statuses are mapped via `normalizeStatus` instead of rewriting rows.
 - Project AI analysis runs from the Grobkosten step and applies results directly (no review step); answers to open questions are stored as text notes so the next incremental AI run picks them up without schema changes.
