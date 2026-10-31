@@ -15,7 +15,6 @@ import { COMPANY } from "@/lib/company";
 import {
   STANDARD_WORK_POSITIONS,
   address,
-  customerName,
   defaultTechnician,
   formatCHF,
   formatDate,
@@ -411,4 +410,3 @@ export function QuoteTotalsCard({ jobId }: { jobId: string }) {
   );
 }
 
-export { customerName };
