@@ -18,8 +18,8 @@ describe("customer invoice", () => {
       markup: 0,
     });
     expect(r.lines).toEqual([
-      { kind: "arbeit", description: "Montage Pissoir", qty: 4, unit: "h", price: 130, amount: 520 },
-      { kind: "material", description: "Pissoir", qty: 1, unit: "Stk", price: 400, amount: 400 },
+      { kind: "arbeit", rubric: "250", description: "Montage Pissoir", qty: 4, unit: "h", price: 130, amount: 520 },
+      { kind: "material", rubric: "250", description: "Pissoir", qty: 1, unit: "Stk", price: 400, amount: 400 },
     ]);
     expect(r.hours).toBe(4);
     expect(r.unpriced).toBe(1);
