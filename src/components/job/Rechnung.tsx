@@ -17,6 +17,7 @@ import { settingsQuery } from "@/lib/queries";
 import { COMPANY } from "@/lib/company";
 import { PROJECT_STEPS, address, customerName, defaultTechnician, formatCHF, normalizeStatus, type Customer, type Job } from "@/lib/app";
 import { computeQuote } from "@/lib/project-quote";
+import { groupByRubric } from "@/lib/rubrics";
 import { SERVICE_REPORT_CSS } from "@/lib/service-report";
 import { appendQrBillPage, downloadFile, elementToPdf } from "@/lib/pdf";
 import { greeting, sendPdfByMail, signature } from "@/lib/mail";
@@ -372,8 +373,7 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
                 </dl>
               </div>
             </div>
-            <InvoiceTable title="Arbeiten" qtyLabel="Stunden" lines={work} />
-            <InvoiceTable title="Material" qtyLabel="Menge" lines={mats} />
+            <RubricInvoiceTables lines={[...work, ...mats]} />
             <InvoiceTable title="Leistung" qtyLabel="" lines={other} />
             <div className="sr-tot">
               <h3>Zusammenfassung</h3>
@@ -394,6 +394,39 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
         </div>
       )}
     </div>
+  );
+}
+
+function RubricInvoiceTables({ lines }: { lines: InvoiceLine[] }) {
+  const groups = groupByRubric(lines, (l) => l.amount);
+  return (
+    <>
+      {groups.map((g) => {
+        const single = g.rubrics.length === 1 && g.rubrics[0]!.rubric.code === g.group;
+        return (
+          <section key={g.group} className="sr-sec">
+            {!single && <h3 style={{ fontSize: 13 }}>{g.group} &nbsp; {g.title}</h3>}
+            {g.rubrics.map((rg) => (
+              <table key={rg.rubric.code} className="sr-table" style={{ marginBottom: 8 }}>
+                <thead><tr><th>{rg.rubric.code} &nbsp; {rg.rubric.title}</th><th className="num">Menge</th><th className="num">Ansatz</th><th className="num">Betrag</th></tr></thead>
+                <tbody>
+                  {rg.items.map((l, i) => (
+                    <tr key={i}>
+                      <td>{l.description}</td>
+                      <td className="num">{l.qty.toLocaleString("de-CH")} {l.unit}</td>
+                      <td className="num">{formatCHF(l.price)}</td>
+                      <td className="num">{formatCHF(l.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot><tr><td colSpan={3}>{rg.rubric.code} Total {rg.rubric.title}</td><td className="num">{formatCHF(rg.total)}</td></tr></tfoot>
+              </table>
+            ))}
+            {!single && <table className="sr-table"><tfoot><tr><td>{g.group} Total {g.title}</td><td className="num">{formatCHF(g.total)}</td></tr></tfoot></table>}
+          </section>
+        );
+      })}
+    </>
   );
 }
 

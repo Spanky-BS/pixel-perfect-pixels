@@ -22,3 +22,4 @@
 - Jobs have `job_type` (project|service); status steps per type live in `src/lib/app.ts` (`stepsFor`), legacy project statuses are mapped via `normalizeStatus` instead of rewriting rows.
 - Project AI analysis runs from the Grobkosten step and applies results directly (no review step); answers to open questions are stored as text notes so the next incremental AI run picks them up without schema changes.
 - Never ignore `.env` in `.gitignore`: it holds only public connection values, and published builds lose the backend connection (blank screen) without it.
+- Offerte, Ausführung and Rechnung share one rubric structure from `src/lib/rubrics.ts` (BKP 25 codes); rows store `rubric`, untagged rows are classified by text via `guessRubric`, so old data needs no backfill.

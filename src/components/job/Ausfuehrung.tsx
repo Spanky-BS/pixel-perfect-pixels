@@ -24,6 +24,7 @@ import {
   type Material,
 } from "@/lib/app";
 import { extraLabour, quotedLabour } from "@/lib/project-quote";
+import { groupByRubric } from "@/lib/rubrics";
 
 export function useTimeEntries(jobId: string) {
   return useQuery({
@@ -88,11 +89,12 @@ export function AusfuehrungWorkspace({
       <section className="space-y-2">
         <h3 className="text-base font-semibold">Offertpositionen / Arbeiten</h3>
         {!quoted.length && <p className="rounded-lg border border-dashed bg-card p-4 text-sm text-muted-foreground">Keine Offertpositionen. Bitte zuerst die Offerte bestätigen.</p>}
-        {quoted.map((l) => {
+        {groupByRubric(quoted, () => 0).flatMap((g) => g.rubrics).flatMap((rg) => rg.items.map((l, i) => ({ l, rg, first: i === 0 }))).map(({ l, rg, first }) => {
           const ist = istHours(l.id);
           const rows = entriesFor(l.id);
           return (
-            <article key={l.id} className="rounded-lg border border-border/80 bg-card px-3 py-3">
+            <article key={l.id} className={`rounded-lg border border-border/80 bg-card px-3 py-3 ${first ? "mt-4" : ""}`}>
+              {first && <p className="mb-1 text-xs font-semibold text-primary"><span className="tabular">{rg.rubric.code}</span> {rg.rubric.title}</p>}
               <p className="font-semibold uppercase tracking-wide">{l.description || "–"}</p>
               {l.notes?.trim() && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
               <div className="mt-2 grid grid-cols-2 gap-2 text-sm">

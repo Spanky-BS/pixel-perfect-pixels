@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/Brand";
 import { IconBtn } from "@/components/job/MaterialList";
 import { categoriesQuery, productsQuery, settingsQuery } from "@/lib/queries";
 import { ibanStatus, normalizeIBAN } from "@/lib/customer-invoice";
+import { DEFAULT_EXCLUSIONS, asStringList } from "@/lib/rubrics";
 import { formatCHF, requireUserId, signedUrls, uploadProfileMedia, BUCKET } from "@/lib/app";
 import { matchesProduct, type Product } from "@/lib/products";
 import { ProductEditor, type ProductDraft } from "@/components/job/ProductEditor";
@@ -148,6 +149,8 @@ function SettingsPage() {
         </div>
         <Button className="h-12 w-full font-medium" onClick={saveCompany}>Speichern</Button>
       </section>
+
+      <ExclusionsSettings value={settings.data?.offer_exclusions} />
 
       <EmployeeProfile
         s={s}
@@ -448,6 +451,59 @@ function Categories() {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function ExclusionsSettings({ value }: { value: unknown }) {
+  const qc = useQueryClient();
+  const list = asStringList(value) ?? DEFAULT_EXCLUSIONS;
+  const [draft, setDraft] = useState("");
+  const [editing, setEditing] = useState<number | null>(null);
+  const [text, setText] = useState("");
+  async function save(next: string[]) {
+    const uid = await requireUserId();
+    const { error } = await supabase.from("settings").update({ offer_exclusions: next }).eq("user_id", uid);
+    if (error) return toast.error(error.message);
+    qc.invalidateQueries({ queryKey: ["settings"] });
+  }
+  const move = (i: number, d: number) => {
+    const j = i + d;
+    if (j < 0 || j >= list.length) return;
+    const n = [...list];
+    [n[i], n[j]] = [n[j]!, n[i]!];
+    void save(n);
+  };
+  return (
+    <section className="space-y-3 rounded-2xl border border-border/70 bg-card p-4">
+      <div>
+        <h2 className="section-title">Nicht enthalten / Annahmen</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Erscheint in jeder neuen Offerte als letzte Rubrik. In der Offerte einzeln löschbar.</p>
+      </div>
+      <div className="divide-y divide-border rounded-xl border border-border">
+        {list.map((t, i) => (
+          <div key={i} className="flex items-start gap-1 px-3 py-2">
+            {editing === i ? (
+              <form className="flex flex-1 gap-2" onSubmit={(e) => { e.preventDefault(); const n = [...list]; n[i] = text.trim(); void save(n.filter(Boolean)); setEditing(null); }}>
+                <Input autoFocus className="h-10 flex-1" value={text} onChange={(e) => setText(e.target.value)} />
+                <Button type="submit" size="sm" className="h-10"><Check className="h-4 w-4" /></Button>
+              </form>
+            ) : (
+              <>
+                <span className="flex-1 py-1.5 text-sm">{t}</span>
+                <IconBtn label="Nach oben" onClick={() => move(i, -1)}><ArrowUp className="h-4 w-4" /></IconBtn>
+                <IconBtn label="Nach unten" onClick={() => move(i, 1)}><ArrowDown className="h-4 w-4" /></IconBtn>
+                <IconBtn label="Bearbeiten" onClick={() => { setEditing(i); setText(t); }}><Pencil className="h-4 w-4" /></IconBtn>
+                <IconBtn label="Löschen" onClick={() => void save(list.filter((_, k) => k !== i))}><Trash2 className="h-4 w-4" /></IconBtn>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (draft.trim()) { void save([...list, draft.trim()]); setDraft(""); } }}>
+        <Input className="h-12 flex-1 text-base" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Neuen Punkt hinzufügen…" />
+        <Button type="submit" className="h-12" disabled={!draft.trim()}>Hinzufügen</Button>
+      </form>
     </section>
   );
 }

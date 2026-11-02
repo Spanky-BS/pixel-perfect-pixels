@@ -27,6 +27,9 @@ const job = {
   work_confirmed: true,
   report_number: "RR-2026-10-01",
   report_created_at: "2026-10-06T17:50:00.000Z",
+  offer_rubric_texts: {},
+  offer_exclusions: null,
+  offer_pricing_mode: "rubric",
 };
 
 describe("service report", () => {
