@@ -27,6 +27,8 @@ import {
 import { computeQuote, labourQuoteAmount, linkedProduct, quotedLabour } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
 import { round5 } from "@/lib/customer-invoice";
+import { ExclusionsSection, OfferRubrics, offerRows, type OfferRow } from "@/components/job/OfferRubrics";
+import { effectiveExclusions, groupByRubric } from "@/lib/rubrics";
 
 const seedingJobs = new Set<string>();
 
@@ -77,6 +79,10 @@ export function OfferteWorkspace({
   const openHours = quoted.filter((l) => !(Number(l.hours) > 0)).length;
   const lastSent = (sent.data ?? []).find((q) => q.status === "Versendet");
   const rate = Number(settings.data?.default_hourly_rate ?? 120);
+  const rows = offerRows(quoted, materials.data ?? [], markup);
+  const texts = (job.offer_rubric_texts && typeof job.offer_rubric_texts === "object" && !Array.isArray(job.offer_rubric_texts) ? job.offer_rubric_texts : {}) as Record<string, string>;
+  const exclusions = effectiveExclusions(job.offer_exclusions, settings.data?.offer_exclusions);
+  const itemized = job.offer_pricing_mode === "itemized";
 
   useEffect(() => {
     if (labour.isLoading || quoted.length || locked) return;
