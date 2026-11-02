@@ -24,6 +24,7 @@ import {
   type Material,
 } from "@/lib/app";
 import { extraLabour, quotedLabour } from "@/lib/project-quote";
+import { groupByRubric } from "@/lib/rubrics";
 
 export function useTimeEntries(jobId: string) {
   return useQuery({
