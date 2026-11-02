@@ -232,7 +232,7 @@ function OffertePdfActions({
   const filename = `Offerte_${nr}_${(job.title || "Projekt").replace(/[^\w\-äöüÄÖÜ]+/g, "_")}`;
   const contact = c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "";
   const custLines = c ? [c.company_name, contact, c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
-  const printed = quoted.filter((l) => labourQuoteAmount(l) > 0);
+  const groups = groupByRubric(rows.filter((r) => r.kind === "material" || (r.amount ?? 0) > 0), (r) => r.amount ?? 0);
 
   async function run(mode: "download" | "mail") {
     if (!ref.current) return;
@@ -300,47 +300,38 @@ function OffertePdfActions({
               </dl>
             </div>
           </div>
-          {printed.length > 0 && (
-            <section className="sr-sec">
-              <h3>Arbeiten</h3>
-              <table className="sr-table">
-                <thead><tr><th>Beschreibung</th><th className="num">Stunden</th><th className="num">Ansatz</th><th className="num">Betrag</th></tr></thead>
-                <tbody>
-                  {printed.map((l) => (
-                    <tr key={l.id}>
-                      <td>{l.description || "–"}{l.notes?.trim() ? <><br /><small>{l.notes}</small></> : null}</td>
-                      <td className="num">{Number(l.hours).toLocaleString("de-CH")}</td>
-                      <td className="num">{formatCHF(Number(l.hourly_rate))}</td>
-                      <td className="num">{formatCHF(labourQuoteAmount(l))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot><tr><td colSpan={3}>Total Arbeit:</td><td className="num">{formatCHF(totals.labourTotal)}</td></tr></tfoot>
-              </table>
-            </section>
-          )}
-          {materials.length > 0 && (
-            <section className="sr-sec">
-              <h3>Material</h3>
-              <table className="sr-table">
-                <thead><tr><th>Artikel</th><th className="num">Menge</th><th className="num">Preis</th><th className="num">Betrag</th></tr></thead>
-                <tbody>
-                  {materials.map((m) => {
-                    const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
-                    const qty = Number(m.quantity);
-                    const vk = p ? unitSalesPrice(p, markup) : null;
-                    return (
-                      <tr key={m.id}>
-                        <td>{p?.name || m.description || "–"}</td>
-                        <td className="num">{qty.toLocaleString("de-CH")} {m.unit}</td>
-                        <td className="num">{vk != null ? formatCHF(vk) : "–"}</td>
-                        <td className="num">{vk != null ? formatCHF(vk * qty) : "–"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot><tr><td colSpan={3}>Total Material:</td><td className="num">{formatCHF(totals.materialTotal)}</td></tr></tfoot>
-              </table>
+          {groups.map((g) => {
+            const single = g.rubrics.length === 1 && g.rubrics[0]!.rubric.code === g.group;
+            return (
+              <section key={g.group} className="sr-sec">
+                {!single && <h3 style={{ fontSize: 13 }}>{g.group} &nbsp; {g.title}</h3>}
+                {g.rubrics.map((rg) => (
+                  <div key={rg.rubric.code} style={{ marginBottom: 10, breakInside: "avoid" }}>
+                    <h3>{rg.rubric.code} &nbsp; {rg.rubric.title}</h3>
+                    {texts[rg.rubric.code]?.trim() && <p style={{ whiteSpace: "pre-line", margin: "2px 0 6px" }}>{texts[rg.rubric.code]}</p>}
+                    <table className="sr-table">
+                      <tbody>
+                        {rg.items.map((r) => (
+                          <tr key={r.id}>
+                            <td>{r.description || "–"}</td>
+                            <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
+                            {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
+                          </tr>
+                        ))}
+                        {!itemized && <tr><td><strong>{rg.rubric.title}</strong></td><td className="num">1.00 LE</td></tr>}
+                      </tbody>
+                      <tfoot><tr><td colSpan={itemized ? 2 : 1}>{rg.rubric.code} Total {rg.rubric.title}</td><td className="num">{formatCHF(rg.total)}</td></tr></tfoot>
+                    </table>
+                  </div>
+                ))}
+                {!single && <table className="sr-table"><tfoot><tr><td>{g.group} Total {g.title}</td><td className="num">{formatCHF(g.total)}</td></tr></tfoot></table>}
+              </section>
+            );
+          })}
+          {exclusions.length > 0 && (
+            <section className="sr-sec" style={{ breakInside: "avoid" }}>
+              <h3>Nicht enthaltene Leistungen &amp; Annahmen</h3>
+              <ul style={{ margin: "4px 0 0 16px", padding: 0 }}>{exclusions.map((t, i) => <li key={i}>{t}</li>)}</ul>
             </section>
           )}
           <div className="sr-tot">
