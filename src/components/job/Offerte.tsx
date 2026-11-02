@@ -130,81 +130,43 @@ export function OfferteWorkspace({
         </div>
       )}
 
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between px-1">
-          <h2 className="section-title">Arbeiten</h2>
-          <span className="text-sm text-muted-foreground tabular">{totals.hours.toLocaleString("de-CH")} h · {formatCHF(totals.labourTotal)}</span>
-        </div>
-        <div className="list-group">
-          {!quoted.length && <p className="px-4 py-4 text-sm text-muted-foreground">Noch keine Arbeitspositionen.</p>}
-          {quoted.map((l) => {
-            const h = Number(l.hours);
-            return (
-              <button key={l.id} type="button" disabled={locked} onClick={() => onEditLabour(l)} className="flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-muted/60 disabled:active:bg-transparent">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px]">{l.description || "–"}</div>
-                  <div className={`text-xs tabular ${h > 0 ? "text-muted-foreground" : "font-medium text-warning"}`}>
-                    {h > 0 ? `${h.toLocaleString("de-CH")} h × ${formatCHF(Number(l.hourly_rate))}` : "Stunden offen"}
-                  </div>
-                </div>
-                <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(labourQuoteAmount(l))}</span>
-                {!locked && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-              </button>
-            );
-          })}
-          {!locked && (
-            <button type="button" onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: rate })} className="flex h-12 w-full items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted">
-              <Plus className="h-4 w-4" /> Arbeit hinzufügen
-            </button>
-          )}
-        </div>
-      </section>
+      <OfferRubrics
+        jobId={jobId}
+        rows={rows}
+        texts={texts}
+        locked={locked}
+        rate={rate}
+        onEditLabour={onEditLabour}
+        onEditMaterial={onEditMaterial}
+        onPickProduct={setProductFor}
+      />
+      {!locked && (
+        <button type="button" onClick={onViewSources} className="h-11 w-full rounded-xl border border-border bg-card text-sm font-medium text-primary">Unterlagen der Begehung ansehen</button>
+      )}
 
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between px-1">
-          <h2 className="section-title">Material</h2>
-          <span className="text-sm text-muted-foreground tabular">{formatCHF(totals.materialTotal)}</span>
+      <ExclusionsSection jobId={jobId} list={exclusions} locked={locked} />
+
+      <section className="surface flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold">Preise im PDF</div>
+          <div className="text-xs text-muted-foreground">{itemized ? "Einzelpreise pro Position sichtbar" : "Kunde sieht nur das Total pro Rubrik"}</div>
         </div>
-        <div className="list-group">
-          {!materials.data?.length && <p className="px-4 py-4 text-sm text-muted-foreground">Noch kein Material.</p>}
-          {(materials.data ?? []).map((m) => {
-            const p = linkedProduct(m as unknown as Parameters<typeof linkedProduct>[0]);
-            const qty = Number(m.quantity);
-            const vk = p ? unitSalesPrice(p, markup) : null;
-            return (
-              <div key={m.id} className="flex min-h-14 items-center gap-3 px-4 py-2.5">
-                <button type="button" disabled={locked} onClick={() => onEditMaterial(m)} className="min-w-0 flex-1 text-left">
-                  <div className="truncate text-[15px]">{p?.name || m.description || "–"}</div>
-                  <div className="text-xs text-muted-foreground tabular">
-                    {qty.toLocaleString("de-CH")} {m.unit}{vk != null ? ` × ${formatCHF(vk)}` : ""}
-                  </div>
-                </button>
-                {vk != null ? (
-                  <button type="button" disabled={locked} onClick={() => setProductFor(m)} className="shrink-0 text-[15px] font-medium tabular">{formatCHF(vk * qty)}</button>
-                ) : (
-                  <button type="button" disabled={locked} onClick={() => setProductFor(m)} className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-3 text-sm font-medium">
-                    <Tag className="h-3.5 w-3.5" /> Produkt wählen
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {!locked && (
-            <div className="grid grid-cols-2 divide-x divide-border">
-              <button type="button" onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen" })} className="flex h-12 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted">
-                <Plus className="h-4 w-4" /> Material
-              </button>
-              <button type="button" onClick={onViewSources} className="flex h-12 items-center justify-center text-sm font-medium text-primary active:bg-muted">Unterlagen</button>
-            </div>
-          )}
+        <div className="flex shrink-0 rounded-lg border border-border p-0.5 text-sm">
+          {(["rubric", "itemized"] as const).map((m) => (
+            <button key={m} disabled={locked} onClick={async () => { await supabase.from("jobs").update({ offer_pricing_mode: m }).eq("id", jobId); qc.invalidateQueries({ queryKey: ["job", jobId] }); }}
+              className={`h-9 rounded-md px-3 ${job.offer_pricing_mode === m || (m === "rubric" && !itemized) ? "bg-primary text-primary-foreground" : ""}`}>
+              {m === "rubric" ? "Pauschal" : "Einzeln"}
+            </button>
+          ))}
         </div>
       </section>
 
       <OffertePdfActions
         job={job}
-        quoted={quoted}
-        materials={materials.data ?? []}
-        markup={markup}
+        rows={rows}
+        texts={texts}
+        exclusions={exclusions}
+        itemized={itemized}
         vatRate={vatRate}
         validDays={validDays}
         totals={totals}
