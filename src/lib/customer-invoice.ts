@@ -2,17 +2,18 @@ import { calculateQRReferenceChecksum, isIBANValid, isQRIBAN } from "swissqrbill
 import type { Data as QrBillData } from "swissqrbill/types";
 import { COMPANY } from "@/lib/company";
 import { unitSalesPrice, type Product } from "@/lib/products";
+import { rubricOf } from "@/lib/rubrics";
 
 /** One invoice row. Lines are stored as a snapshot on the invoice so the PDF never changes afterwards. */
-export type InvoiceLine = { kind: "arbeit" | "material" | "akonto"; description: string; qty: number; unit: string; price: number; amount: number };
+export type InvoiceLine = { kind: "arbeit" | "material" | "akonto"; rubric?: string; description: string; qty: number; unit: string; price: number; amount: number };
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
 /** Swiss cash rounding to 5 Rappen. */
 export const round5 = (n: number) => Math.round(n * 20) / 20;
 
-type LabourIn = { id: string; description: string; hourly_rate: number | string | null };
+type LabourIn = { id: string; description: string; rubric?: string | null; hourly_rate: number | string | null };
 type TimeIn = { labour_item_id: string; hours: number | string };
-type MaterialIn = { description: string; unit: string; quantity: number | string; actual_quantity?: number | string | null; products?: Product | Product[] | null };
+type MaterialIn = { description: string; rubric?: string | null; unit: string; quantity: number | string; actual_quantity?: number | string | null; products?: Product | Product[] | null };
 
 /** Project invoice = effective effort: booked hours from Ausführung and used material (Ist-Menge, else Offerte-Menge). */
 export function invoiceLinesFromActuals(input: {
@@ -29,7 +30,7 @@ export function invoiceLinesFromActuals(input: {
     if (h <= 0) continue;
     const rate = Number(l.hourly_rate) || input.defaultRate;
     hours += h;
-    lines.push({ kind: "arbeit", description: l.description || "Arbeit", qty: round2(h), unit: "h", price: rate, amount: round2(h * rate) });
+    lines.push({ kind: "arbeit", rubric: rubricOf(l), description: l.description || "Arbeit", qty: round2(h), unit: "h", price: rate, amount: round2(h * rate) });
   }
   let unpriced = 0;
   for (const m of input.materials) {
@@ -39,7 +40,7 @@ export function invoiceLinesFromActuals(input: {
     const p = Array.isArray(raw) ? raw[0] ?? null : raw ?? null;
     const vk = p ? unitSalesPrice(p, input.markup) : null;
     if (vk == null) { unpriced += 1; continue; }
-    lines.push({ kind: "material", description: p?.name || m.description || "Material", qty, unit: m.unit || "Stk", price: round2(vk), amount: round2(vk * qty) });
+    lines.push({ kind: "material", rubric: rubricOf(m), description: p?.name || m.description || "Material", qty, unit: m.unit || "Stk", price: round2(vk), amount: round2(vk * qty) });
   }
   return { lines, hours: round2(hours), unpriced };
 }
