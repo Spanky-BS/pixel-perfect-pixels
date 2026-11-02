@@ -211,12 +211,13 @@ export function OfferteWorkspace({
 type SettingsRow = { company_name?: string | null; default_technician?: string | null; technician_phone?: string | null } | null | undefined;
 
 function OffertePdfActions({
-  job, quoted, materials, markup, vatRate, validDays, totals, settings, onSent,
+  job, rows, texts, exclusions, itemized, vatRate, validDays, totals, settings, onSent,
 }: {
   job: JobWithCustomer;
-  quoted: Labour[];
-  materials: Material[];
-  markup: number;
+  rows: OfferRow[];
+  texts: Record<string, string>;
+  exclusions: string[];
+  itemized: boolean;
   vatRate: number;
   validDays: number;
   totals: ReturnType<typeof computeQuote>;
