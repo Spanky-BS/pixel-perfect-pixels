@@ -149,6 +149,8 @@ function SettingsPage() {
         <Button className="h-12 w-full font-medium" onClick={saveCompany}>Speichern</Button>
       </section>
 
+      <ExclusionsSettings value={settings.data?.offer_exclusions} />
+
       <EmployeeProfile
         s={s}
         setS={(p) => setS((cur) => ({ ...cur, ...p }))}
