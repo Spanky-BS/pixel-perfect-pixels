@@ -405,6 +405,9 @@ export type Database = {
           job_type: string
           lifecycle_status: string
           notes: string | null
+          offer_exclusions: Json | null
+          offer_pricing_mode: string
+          offer_rubric_texts: Json
           problem_description: string | null
           report_created_at: string | null
           report_number: string | null
@@ -432,6 +435,9 @@ export type Database = {
           job_type?: string
           lifecycle_status?: string
           notes?: string | null
+          offer_exclusions?: Json | null
+          offer_pricing_mode?: string
+          offer_rubric_texts?: Json
           problem_description?: string | null
           report_created_at?: string | null
           report_number?: string | null
@@ -459,6 +465,9 @@ export type Database = {
           job_type?: string
           lifecycle_status?: string
           notes?: string | null
+          offer_exclusions?: Json | null
+          offer_pricing_mode?: string
+          offer_rubric_texts?: Json
           problem_description?: string | null
           report_created_at?: string | null
           report_number?: string | null
@@ -493,6 +502,7 @@ export type Database = {
           job_id: string
           notes: string | null
           parent_id: string | null
+          rubric: string | null
           sort_order: number
           source: string
           updated_at: string
@@ -510,6 +520,7 @@ export type Database = {
           job_id: string
           notes?: string | null
           parent_id?: string | null
+          rubric?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
@@ -527,6 +538,7 @@ export type Database = {
           job_id?: string
           notes?: string | null
           parent_id?: string | null
+          rubric?: string | null
           sort_order?: number
           source?: string
           updated_at?: string
@@ -646,6 +658,7 @@ export type Database = {
           preferred_brand: string | null
           product_id: string | null
           quantity: number
+          rubric: string | null
           sort_order: number
           source: string
           status: string
@@ -667,6 +680,7 @@ export type Database = {
           preferred_brand?: string | null
           product_id?: string | null
           quantity?: number
+          rubric?: string | null
           sort_order?: number
           source?: string
           status?: string
@@ -688,6 +702,7 @@ export type Database = {
           preferred_brand?: string | null
           product_id?: string | null
           quantity?: number
+          rubric?: string | null
           sort_order?: number
           source?: string
           status?: string
@@ -1155,6 +1170,7 @@ export type Database = {
           estimate_vehicle_per_day: number
           iban: string | null
           invoice_payment_days: number
+          offer_exclusions: Json
           offer_valid_days: number
           service_hourly_rate: number
           small_material_allowance: number
@@ -1183,6 +1199,7 @@ export type Database = {
           estimate_vehicle_per_day?: number
           iban?: string | null
           invoice_payment_days?: number
+          offer_exclusions?: Json
           offer_valid_days?: number
           service_hourly_rate?: number
           small_material_allowance?: number
@@ -1211,6 +1228,7 @@ export type Database = {
           estimate_vehicle_per_day?: number
           iban?: string | null
           invoice_payment_days?: number
+          offer_exclusions?: Json
           offer_valid_days?: number
           service_hourly_rate?: number
           small_material_allowance?: number
