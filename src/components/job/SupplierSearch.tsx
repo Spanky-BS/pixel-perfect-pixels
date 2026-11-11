@@ -5,6 +5,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Input } from "@/components/ui/input";
 import { formatCHF } from "@/lib/app";
 import { CATALOG_SUPPLIERS, unitPrice, type CatalogHit, type CatalogSupplier, type SupplierResult } from "@/lib/suppliers/catalog";
+import { supabase } from "@/integrations/supabase/client";
+import { rankFavorites, type Favorite, type PickedProduct } from "@/lib/suppliers/favorites";
 import { loadEngelVariants, searchSupplierCatalog } from "@/lib/suppliers/catalog.functions";
 
 const ACTIVE = CATALOG_SUPPLIERS.filter((s) => s.connected).map((s) => s.id);
@@ -18,6 +20,15 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
   const [results, setResults] = useState<SupplierResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<PickedProduct[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    supabase.from("products").select("name,description,manufacturer,manufacturer_article_no,supplier_article_no,unit,purchase_price,source,created_at")
+      .like("source", "%-public").order("created_at", { ascending: false }).limit(1000)
+      .then(({ data }) => setPicked((data ?? []) as PickedProduct[]));
+  }, [open]);
+  const favorites: Favorite[] = q.trim().length >= 2 ? rankFavorites(picked, q).filter((f) => filter === "all" || f.hit.supplierId === filter) : [];
 
   useEffect(() => {
     const term = q.trim();
@@ -61,6 +72,18 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
             })}
             <span className="flex h-9 shrink-0 items-center rounded-full border border-dashed border-border px-3 text-xs text-muted-foreground">Sanitas Troesch: noch nicht verbunden</span>
           </div>
+          {favorites.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Häufig verwendet</h3>
+              {favorites.map((f) => (
+                <div key={f.hit.productId} className="relative">
+                  <span className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">{f.uses}× verwendet</span>
+                  <HitRow hit={f.hit} busy={busy} onPick={pick} />
+                </div>
+              ))}
+              <h3 className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live-Kataloge</h3>
+            </div>
+          )}
           {loading && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Lieferanten werden abgefragt …</p>}
           {!loading && q.trim().length >= 2 && results.length > 0 && shown.every((r) => !r.hits.length) && (
             <p className="rounded-xl border border-dashed bg-card p-4 text-center text-sm text-muted-foreground">Keine Treffer. Anderen Begriff versuchen (z.B. Hersteller oder Art.-Nr.).</p>
