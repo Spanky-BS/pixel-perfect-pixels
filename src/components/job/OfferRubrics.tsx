@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, ChevronRight, FileText, Plus, Tag, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, FileText, Plus, Search, Tag, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCHF, type Labour, type Material } from "@/lib/app";
 import { labourQuoteAmount, linkedProduct } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
 import { RUBRICS, groupByRubric, rubricOf } from "@/lib/rubrics";
+import { addCatalogHitToOffer } from "@/lib/suppliers/add-to-offer";
+import { SupplierSearch } from "./SupplierSearch";
 
 export type OfferRow =
   | { kind: "arbeit"; id: string; description: string; rubric: string | null; sort_order: number; amount: number | null; row: Labour }
@@ -39,6 +41,7 @@ export function OfferRubrics({
 }) {
   const qc = useQueryClient();
   const [extra, setExtra] = useState<string[]>([]);
+  const [searchFor, setSearchFor] = useState<string | null>(null);
   const groups = groupByRubric(rows, (r) => r.amount ?? 0);
   const used = new Set(rows.map((r) => rubricOf(r)));
   const shown = new Set([...used, ...extra, ...Object.keys(texts).filter((k) => texts[k]?.trim())]);
@@ -131,7 +134,8 @@ export function OfferRubrics({
                 </div>
               ))}
               {!locked && (
-                <div className="grid grid-cols-2 divide-x divide-border">
+                <div className="grid grid-cols-3 divide-x divide-border">
+                  <button type="button" onClick={() => setSearchFor(rub.code)} className="flex h-11 items-center justify-center gap-1 text-sm font-semibold text-primary active:bg-muted"><Search className="h-4 w-4" /> Produkt</button>
                   <button type="button" onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: rate, rubric: rub.code })} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted"><Plus className="h-4 w-4" /> Arbeit</button>
                   <button type="button" onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen", rubric: rub.code })} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted"><Plus className="h-4 w-4" /> Material</button>
                 </div>
@@ -140,6 +144,23 @@ export function OfferRubrics({
           </section>
         );
       })}
+      <SupplierSearch
+        open={searchFor != null}
+        title={searchFor ? `Produkt für ${searchFor} ${RUBRICS.find((x) => x.code === searchFor)?.title ?? ""}` : undefined}
+        onClose={() => setSearchFor(null)}
+        onPick={async (hit) => {
+          if (!searchFor) return;
+          try {
+            const max = rows.reduce((m, r) => Math.max(m, r.sort_order), 0);
+            await addCatalogHitToOffer(jobId, searchFor, hit, max + 1);
+            toast.success("In Offerte übernommen – Menge antippen zum Anpassen");
+            refresh();
+            setSearchFor(null);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Übernehmen fehlgeschlagen");
+          }
+        }}
+      />
       {!locked && missing.length > 0 && (
         <select value="" onChange={(e) => e.target.value && setExtra([...extra, e.target.value])} className="h-12 w-full rounded-xl border border-dashed border-border bg-card px-3 text-sm font-medium text-primary">
           <option value="">+ Rubrik hinzufügen…</option>
