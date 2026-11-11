@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { FolderPlus, Search, Wrench, X } from "lucide-react";
+import { FolderPlus, Search, Wrench, X, FileText, HardHat, Hammer, ClipboardList } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { JobCard, jobBadge } from "@/components/JobCard";
 import { jobsQuery } from "@/lib/queries";
@@ -66,7 +66,14 @@ function Dashboard() {
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-4">
+        <Kpi icon={HardHat} label="Aktive Projekte" value={projects.length} hint="in Bearbeitung" />
+        <Kpi icon={FileText} label="Offerten" value={projects.filter((j) => jobBadge(j) === "Offerte").length} hint="warten auf Entscheid" />
+        <Kpi icon={Hammer} label="In Ausführung" value={projects.filter((j) => jobBadge(j) === "Ausführung").length} hint="laufende Baustellen" />
+        <Kpi icon={ClipboardList} label="Regieaufträge" value={services.length} hint="offen" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5 lg:max-w-md">
         <Link to="/baustellen/neu" search={{ typ: "project" }}
           className="flex h-14 items-center gap-3 rounded-xl bg-primary px-4 text-[15px] font-medium text-primary-foreground transition-opacity active:opacity-85"
           style={{ boxShadow: "var(--shadow-primary)" }}>
@@ -111,6 +118,7 @@ function Dashboard() {
             </div>
           )}
 
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           {showProjects && (
             <section className="space-y-2">
               <h2 className="section-title px-1">Projekte</h2>
@@ -127,8 +135,21 @@ function Dashboard() {
               ) : !jobs.isLoading && <Empty text="Keine offenen Serviceaufträge." />}
             </section>
           )}
+          </div>
         </>
       )}
+    </div>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, hint }: { icon: typeof HardHat; label: string; value: number; hint: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+        {label}<Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      </div>
+      <p className="mt-2 text-2xl font-semibold tabular tracking-tight">{value}</p>
+      <p className="mt-0.5 truncate text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }
