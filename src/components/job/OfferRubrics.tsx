@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, ChevronRight, FileText, Plus, Search, Tag, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, FileText, Plus, Tag, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCHF, type Labour, type Material } from "@/lib/app";
