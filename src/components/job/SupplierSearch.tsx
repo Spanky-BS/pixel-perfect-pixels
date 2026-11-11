@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ExternalLink, Loader2, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,9 +11,9 @@ const ACTIVE = CATALOG_SUPPLIERS.filter((s) => s.connected).map((s) => s.id);
 const nameOf = (id: CatalogSupplier) => CATALOG_SUPPLIERS.find((s) => s.id === id)?.name ?? id;
 
 /** Search the wholesalers' public catalogues and hand one priced article back. */
-export function SupplierSearch({ open, onClose, onPick, title }: { open: boolean; onClose: () => void; onPick: (h: CatalogHit) => Promise<void> | void; title?: string | undefined }) {
+export function SupplierSearch({ open, onClose, onPick, title, initialQuery, footer }: { open: boolean; onClose: () => void; onPick: (h: CatalogHit) => Promise<void> | void; title?: string | undefined; initialQuery?: string | undefined; footer?: ReactNode }) {
   const search = useServerFn(searchSupplierCatalog);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(initialQuery ?? "");
   const [filter, setFilter] = useState<CatalogSupplier | "all">("all");
   const [results, setResults] = useState<SupplierResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,6 +76,7 @@ export function SupplierSearch({ open, onClose, onPick, title }: { open: boolean
             </div>
           ))}
           <p className="px-1 text-xs text-muted-foreground">Öffentliche Shop-Preise (keine persönlichen Nettopreise). Der Preis wird beim Übernehmen in der Offerte fixiert.</p>
+          {footer}
         </div>
       </SheetContent>
     </Sheet>

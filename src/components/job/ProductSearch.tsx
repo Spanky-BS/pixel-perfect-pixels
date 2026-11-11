@@ -8,6 +8,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductEditor, type ProductDraft } from "./ProductEditor";
+import { SupplierSearch } from "./SupplierSearch";
+import { assignCatalogHit } from "@/lib/suppliers/add-to-offer";
 
 /**
  * Manual product picker. Live supplier hits can later be merged into the same list
@@ -33,6 +35,7 @@ export function ProductSearch({
   const [categoryId, setCategoryId] = useState("");
   const [draft, setDraft] = useState<ProductDraft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [live, setLive] = useState(true);
 
   const catName = (id: string | null) => cats.data?.find((c) => c.id === id)?.name ?? "";
   const hits: ProductSearchHit[] = useMemo(() => {
@@ -57,6 +60,29 @@ export function ProductSearch({
     } finally {
       setBusy(false);
     }
+  }
+
+  if (live) {
+    return (
+      <SupplierSearch
+        open={open}
+        title={hint ? `Produkt für «${hint}»` : "Produkt auswählen"}
+        initialQuery={hint}
+        onClose={onClose}
+        onPick={async (hit) => {
+          try {
+            await assignCatalogHit(materialId, hit);
+            toast.success("Produkt mit Preis übernommen");
+            qc.invalidateQueries({ queryKey: ["materials", jobId] });
+            qc.invalidateQueries({ queryKey: ["products"] });
+            onClose();
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Übernehmen fehlgeschlagen");
+          }
+        }}
+        footer={<Button variant="outline" className="h-11 w-full" onClick={() => setLive(false)}>Eigene Produkte / manuell erfassen</Button>}
+      />
+    );
   }
 
   return (
