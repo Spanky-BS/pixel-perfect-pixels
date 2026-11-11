@@ -134,10 +134,9 @@ export function OfferRubrics({
                 </div>
               ))}
               {!locked && (
-                <div className="grid grid-cols-3 divide-x divide-border">
-                  <button type="button" onClick={() => setSearchFor(rub.code)} className="flex h-11 items-center justify-center gap-1 text-sm font-semibold text-primary active:bg-muted"><Search className="h-4 w-4" /> Produkt</button>
+                <div className="grid grid-cols-2 divide-x divide-border">
                   <button type="button" onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: rate, rubric: rub.code })} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted"><Plus className="h-4 w-4" /> Arbeit</button>
-                  <button type="button" onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen", rubric: rub.code })} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted"><Plus className="h-4 w-4" /> Material</button>
+                  <button type="button" onClick={() => setSearchFor(rub.code)} className="flex h-11 items-center justify-center gap-1 text-sm font-semibold text-primary active:bg-muted"><Plus className="h-4 w-4" /> Material</button>
                 </div>
               )}
             </div>
@@ -148,6 +147,9 @@ export function OfferRubrics({
         open={searchFor != null}
         title={searchFor ? `Produkt für ${searchFor} ${RUBRICS.find((x) => x.code === searchFor)?.title ?? ""}` : undefined}
         onClose={() => setSearchFor(null)}
+        footer={searchFor ? (
+          <button type="button" onClick={() => { const code = searchFor; setSearchFor(null); onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen", rubric: code }); }} className="h-11 w-full rounded-xl border border-dashed border-border text-sm font-medium text-primary">Manuell erfassen (ohne Katalog)</button>
+        ) : undefined}
         onPick={async (hit) => {
           if (!searchFor) return;
           try {
