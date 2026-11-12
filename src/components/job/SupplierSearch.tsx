@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { formatCHF } from "@/lib/app";
 import { CATALOG_SUPPLIERS, unitPrice, type CatalogHit, type CatalogSupplier, type SupplierResult } from "@/lib/suppliers/catalog";
 import { supabase } from "@/integrations/supabase/client";
-import { rankFavorites, type Favorite, type PickedProduct } from "@/lib/suppliers/favorites";
+import { rankFavorites, withLivePrice, type Favorite, type PickedProduct } from "@/lib/suppliers/favorites";
 import { loadEngelVariants, searchSupplierCatalog } from "@/lib/suppliers/catalog.functions";
 
 const ACTIVE = CATALOG_SUPPLIERS.filter((s) => s.connected).map((s) => s.id);
@@ -49,6 +49,22 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
     setBusy(true);
     try { await onPick(h); } finally { setBusy(false); }
   }
+  const liveHits = results.flatMap((r) => r.hits);
+
+  /** Favourite not in current live results: look it up by article number so today's price is used. */
+  async function pickFavorite(f: Favorite) {
+    const cur = withLivePrice(f, liveHits);
+    if (cur.fresh || !f.hit.supplierArticleNumber) return pick(cur.hit);
+    setBusy(true);
+    try {
+      const r = await search({ data: { q: f.hit.supplierArticleNumber, suppliers: [f.hit.supplierId] } });
+      const again = withLivePrice(f, r.flatMap((x) => x.hits));
+      if (!again.fresh && !confirm("Aktueller Shop-Preis nicht gefunden. Letzten bekannten Preis übernehmen?")) return;
+      await onPick(again.hit);
+    } catch {
+      if (confirm("Shop nicht erreichbar. Letzten bekannten Preis übernehmen?")) await onPick(f.hit);
+    } finally { setBusy(false); }
+  }
 
   const shown = results.filter((r) => filter === "all" || r.supplierId === filter);
 
@@ -75,12 +91,18 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
           {favorites.length > 0 && (
             <div className="space-y-2">
               <h3 className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Häufig verwendet</h3>
-              {favorites.map((f) => (
-                <div key={f.hit.productId} className="relative">
-                  <span className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">{f.uses}× verwendet</span>
-                  <HitRow hit={f.hit} busy={busy} onPick={pick} />
-                </div>
-              ))}
+              {favorites.map((f) => {
+                const cur = withLivePrice(f, liveHits);
+                return (
+                  <div key={f.hit.productId} className="relative">
+                    <span className="absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">{f.uses}× verwendet</span>
+                    <HitRow hit={cur.hit} busy={busy} onPick={() => pickFavorite(f)} />
+                    <p className="px-3 pb-1 text-[11px] text-muted-foreground">
+                      {cur.fresh ? "Preis tagesaktuell aus dem Shop" : loading ? "Aktueller Preis wird geprüft …" : `Letzter Preis vom ${new Date(f.lastUsed).toLocaleDateString("de-CH")} – wird beim Übernehmen im Shop aktualisiert`}
+                    </p>
+                  </div>
+                );
+              })}
               <h3 className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Live-Kataloge</h3>
             </div>
           )}

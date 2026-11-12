@@ -41,3 +41,11 @@ export function rankFavorites(rows: PickedProduct[], query: string, limit = 8): 
     .sort((a, b) => b.uses - a.uses || b.lastUsed.localeCompare(a.lastUsed))
     .slice(0, limit);
 }
+
+/** Swap a favourite's stored snapshot for today's live hit (same supplier + article number). */
+export function withLivePrice(fav: Favorite, liveHits: CatalogHit[]): { hit: CatalogHit; fresh: boolean } {
+  const art = fav.hit.supplierArticleNumber;
+  const live = art ? liveHits.find((h) => h.supplierId === fav.hit.supplierId && h.supplierArticleNumber === art && !h.hasVariants && unitPriceOf(h) != null) : undefined;
+  return live ? { hit: live, fresh: true } : { hit: fav.hit, fresh: false };
+}
+const unitPriceOf = (h: CatalogHit) => h.customerNetPrice ?? h.publicGrossPrice;

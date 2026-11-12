@@ -20,3 +20,18 @@ describe("rankFavorites", () => {
     expect(rankFavorites([row({ source: "manual" })], "handbrause")).toHaveLength(0);
   });
 });
+
+import { withLivePrice } from "./favorites";
+describe("withLivePrice", () => {
+  const fav = { uses: 2, lastUsed: "2026-01-01", hit: { supplierId: "richner", supplierArticleNumber: "A1", publicGrossPrice: 100, customerNetPrice: null, hasVariants: false } } as any;
+  it("uses today's shop price when the article is in the live results", () => {
+    const r = withLivePrice(fav, [{ ...fav.hit, publicGrossPrice: 115 }]);
+    expect(r.fresh).toBe(true);
+    expect(r.hit.publicGrossPrice).toBe(115);
+  });
+  it("keeps the old price but marks it not fresh when not found", () => {
+    const r = withLivePrice(fav, [{ ...fav.hit, supplierId: "engel", publicGrossPrice: 90 }]);
+    expect(r.fresh).toBe(false);
+    expect(r.hit.publicGrossPrice).toBe(100);
+  });
+});
