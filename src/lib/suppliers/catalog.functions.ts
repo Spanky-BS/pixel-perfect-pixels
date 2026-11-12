@@ -7,10 +7,10 @@ const sup = z.enum(["richner", "engel", "pestalozzi", "sanitas"]);
 
 export const searchSupplierCatalog = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ q: z.string().trim().min(2).max(80), suppliers: z.array(sup).min(1).max(4) }).parse(d))
+  .inputValidator((d) => z.object({ q: z.string().trim().min(2).max(80), suppliers: z.array(sup).min(1).max(4), page: z.number().int().min(1).max(50).default(1) }).parse(d))
   .handler(async ({ data }): Promise<SupplierResult[]> => {
     const { searchCatalog } = await import("./catalog.server");
-    return searchCatalog(data.q, data.suppliers);
+    return searchCatalog(data.q, data.suppliers, data.page);
   });
 
 export const loadEngelVariants = createServerFn({ method: "POST" })

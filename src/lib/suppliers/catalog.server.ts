@@ -33,22 +33,24 @@ async function getJson(url: string, init?: RequestInit, ms?: number) {
 const cache = new Map<string, { at: number; v: SupplierResult }>();
 const TTL: Record<CatalogSupplier, number> = { richner: 10 * 60e3, engel: 30 * 60e3, pestalozzi: 30 * 60e3, sanitas: 0 };
 
-async function richner(q: string): Promise<SupplierResult> {
+async function richner(q: string, page: number): Promise<SupplierResult> {
   const base = "https://baubedarf-richner.ch/api/v1";
-  const { hits, total } = mapRichnerProducts(await getJson(`${base}/products?q=${encodeURIComponent(q)}&p=1`));
+  const { hits, total } = mapRichnerProducts(await getJson(`${base}/products?q=${encodeURIComponent(q)}&p=${page}`));
   const ids = hits.slice(0, LIMIT).map((h) => `ids=${encodeURIComponent(h.productId)}`).join("&");
   const [prices, stocks] = ids
     ? await Promise.all([getJson(`${base}/products/prices?${ids}`).catch(() => ({})), getJson(`${base}/products/stocks?${ids}`).catch(() => ({}))])
     : [{}, {}];
-  return { supplierId: "richner", hits: applyRichnerPrices(hits.slice(0, LIMIT), prices, stocks), total, partial: (total ?? 0) > LIMIT, error: null };
+  return { supplierId: "richner", hits: applyRichnerPrices(hits.slice(0, LIMIT), prices, stocks), total, partial: hits.length > 0 && (total ?? 0) > (page - 1) * 24 + hits.length, error: null };
 }
 
-async function engel(q: string): Promise<SupplierResult> {
+async function engel(q: string, page: number): Promise<SupplierResult> {
   const json = await getJson("https://shop.engel.ch/pagesshop/rpc/rpc_search.cfm", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: `q=${encodeURIComponent(q)}&srv=search`,
   });
   const { hits, total } = parseEngelSearch(json);
-  return { supplierId: "engel", hits: hits.slice(0, LIMIT), total, partial: (total ?? 0) > hits.length || hits.length > LIMIT, error: null };
+  // ENGEL returns its whole result list at once; page through it here.
+  const from = (page - 1) * LIMIT;
+  return { supplierId: "engel", hits: hits.slice(from, from + LIMIT), total, partial: hits.length > from + LIMIT, error: null };
 }
 
 export async function engelVariants(artid: string, base: CatalogHit) {
@@ -78,7 +80,8 @@ async function pestalozziCookie() {
   return cookie;
 }
 
-async function pestalozzi(q: string): Promise<SupplierResult> {
+async function pestalozzi(q: string, page: number): Promise<SupplierResult> {
+  const want = page * LIMIT;
   const cookie = await pestalozziCookie();
   const r = await timed(`https://shop.pestalozzi.com/haustechnik/api/productall?key=SEARCH&value=${encodeURIComponent(q)}`, { headers: { Cookie: cookie } }, 12000);
   if (!r.ok || !r.body) throw new Error(`HTTP ${r.status}`);
@@ -92,24 +95,24 @@ async function pestalozzi(q: string): Promise<SupplierResult> {
     if (d) { done = true; break; }
     bytes += value.byteLength;
     scan.push(dec.decode(value, { stream: true }));
-    if (scan.items.length >= LIMIT || bytes > 6_000_000 || Date.now() - started > 9000) { partial = true; break; }
+    if (scan.items.length >= want || bytes > 6_000_000 * page || Date.now() - started > 9000 + 3000 * page) { partial = true; break; }
   }
   if (partial) await reader.cancel().catch(() => {});
   if (pestSession && !scan.items.length && !done) pestSession = null;
-  const hits = mapPestalozzi(scan.items.slice(0, LIMIT) as object[]);
-  return { supplierId: "pestalozzi", hits, total: partial ? null : hits.length, partial, error: null };
+  const hits = mapPestalozzi(scan.items.slice(want - LIMIT, want) as object[]);
+  return { supplierId: "pestalozzi", hits, total: partial ? null : scan.items.length, partial: partial && hits.length > 0, error: null };
 }
 
-const RUN: Record<Exclude<CatalogSupplier, "sanitas">, (q: string) => Promise<SupplierResult>> = { richner, engel, pestalozzi };
+const RUN: Record<Exclude<CatalogSupplier, "sanitas">, (q: string, page: number) => Promise<SupplierResult>> = { richner, engel, pestalozzi };
 
-export async function searchCatalog(q: string, suppliers: CatalogSupplier[]): Promise<SupplierResult[]> {
+export async function searchCatalog(q: string, suppliers: CatalogSupplier[], page = 1): Promise<SupplierResult[]> {
   return Promise.all(suppliers.map(async (s): Promise<SupplierResult> => {
     if (s === "sanitas") return { supplierId: s, hits: [], total: null, partial: false, error: "Noch nicht verbunden" };
-    const key = `${s}:${q.toLowerCase()}`;
+    const key = `${s}:${page}:${q.toLowerCase()}`;
     const c = cache.get(key);
     if (c && Date.now() - c.at < TTL[s]) return c.v;
     try {
-      const v = await RUN[s](q);
+      const v = await RUN[s](q, page);
       cache.set(key, { at: Date.now(), v });
       if (cache.size > 300) cache.delete(cache.keys().next().value!);
       return v;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ChevronDown, ExternalLink, Loader2, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -19,6 +19,9 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
   const [filter, setFilter] = useState<CatalogSupplier | "all">("all");
   const [results, setResults] = useState<SupplierResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<PickedProduct[]>([]);
 
@@ -38,12 +41,41 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
       setLoading(true);
       try {
         const r = await search({ data: { q: term, suppliers: ACTIVE } });
-        if (live) setResults(r);
+        if (live) { setResults(r); setPage(1); }
       } catch { if (live) setResults([]); }
       finally { if (live) setLoading(false); }
     }, 450);
     return () => { live = false; clearTimeout(t); };
   }, [q]);
+
+  /** Next page from every shop that still has more hits for the current filter. */
+  const canMore = results.some((r) => r.partial && !r.error && (filter === "all" || r.supplierId === filter));
+  async function loadMore() {
+    const term = q.trim();
+    const sups = results.filter((r) => r.partial && !r.error && (filter === "all" || r.supplierId === filter)).map((r) => r.supplierId);
+    if (loadingMore || !sups.length || term.length < 2) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const r = await search({ data: { q: term, suppliers: sups, page: next } });
+      if (q.trim() !== term) return;
+      setResults((prev) => prev.map((p) => {
+        const n = r.find((x) => x.supplierId === p.supplierId);
+        if (!n) return p;
+        const seen = new Set(p.hits.map((h) => h.productId));
+        const add = n.hits.filter((h) => !seen.has(h.productId));
+        return { ...p, hits: [...p.hits, ...add], partial: n.partial && add.length > 0, error: n.error };
+      }));
+      setPage(next);
+    } finally { setLoadingMore(false); }
+  }
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !canMore) return;
+    const io = new IntersectionObserver((e) => { if (e[0]?.isIntersecting) void loadMore(); }, { rootMargin: "300px" });
+    io.observe(el);
+    return () => io.disconnect();
+  });
 
   async function pick(h: CatalogHit) {
     setBusy(true);
@@ -114,12 +146,19 @@ export function SupplierSearch({ open, onClose, onPick, title, initialQuery, foo
             <div key={r.supplierId} className="space-y-2">
               {(r.error || r.partial) && (
                 <p className="px-1 text-xs text-muted-foreground">
-                  {nameOf(r.supplierId)}: {r.error ?? `erste ${r.hits.length}${r.total ? ` von ${r.total}` : ""} Treffer – Suche verfeinern`}
+                  {nameOf(r.supplierId)}: {r.error ?? `${r.hits.length}${r.total ? ` von ${r.total}` : ""} Treffer geladen`}
                 </p>
               )}
               {r.hits.map((h) => (h.hasVariants ? <EngelItem key={h.productId} hit={h} busy={busy} onPick={pick} /> : <HitRow key={h.productId} hit={h} busy={busy} onPick={pick} />))}
             </div>
           ))}
+          {!loading && canMore && (
+            <div ref={sentinel}>
+              <button onClick={() => void loadMore()} disabled={loadingMore} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border bg-card text-sm font-medium">
+                {loadingMore ? <><Loader2 className="h-4 w-4 animate-spin" /> Weitere Treffer werden geladen …</> : "Mehr laden"}
+              </button>
+            </div>
+          )}
           <p className="px-1 text-xs text-muted-foreground">Öffentliche Shop-Preise (keine persönlichen Nettopreise). Der Preis wird beim Übernehmen in der Offerte fixiert.</p>
           {footer}
         </div>
