@@ -196,7 +196,10 @@ body { font-family: "IBM Plex Sans", Helvetica, Arial, sans-serif; font-size: 10
 .of-rub { margin: 0 0 12px; break-inside: avoid; }
 .of-rub-h { margin: 0 0 3px; color: #1a2433; font-size: 9.5pt; font-weight: 700; }
 .of-text { margin: 0 0 4px 46px; max-width: 70%; white-space: pre-line; line-height: 1.45; color: #2b3645; }
-.of-items { margin-left: 46px; width: calc(100% - 46px); }
+.of-items { margin: 0 0 0 46px; width: calc(100% - 46px); }
+.of-items td { padding-top: 2px; padding-bottom: 2px; border-bottom: none; }
+.of-free-h { margin: 7px 0 3px 46px; color: #1e4d8c; font-size: 8.5pt; font-weight: 700; }
+.of-free-text { margin: 0 0 5px 46px; max-width: 70%; white-space: pre-line; line-height: 1.45; color: #2b3645; }
 .of-sum { display: flex; justify-content: space-between; margin-left: 46px; padding: 4px 0 0; border-top: 1px solid #d5dfeb; font-weight: 600; font-variant-numeric: tabular-nums; }
 .of-gsum { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1.5px solid #1e4d8c; color: #1e4d8c; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sr-table th { color: #1e4d8c; border-bottom: 1px solid #1e4d8c; font-size: 8pt; font-weight: 700; text-align: left; padding: 5px 6px; }

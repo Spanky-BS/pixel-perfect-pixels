@@ -27,7 +27,8 @@ import {
 import { computeQuote, labourQuoteAmount, linkedProduct, quotedLabour } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
 import { round5 } from "@/lib/customer-invoice";
-import { ExclusionsSection, OfferRubrics, offerRows, type OfferRow } from "@/components/job/OfferRubrics";
+import { ExclusionsSection, OfferRubrics } from "@/components/job/OfferRubrics";
+import { offerRows, type OfferRow } from "@/lib/offer-editor";
 import { effectiveExclusions, groupByRubric } from "@/lib/rubrics";
 
 const seedingJobs = new Set<string>();
@@ -79,7 +80,7 @@ export function OfferteWorkspace({
   const openHours = quoted.filter((l) => !(Number(l.hours) > 0)).length;
   const lastSent = (sent.data ?? []).find((q) => q.status === "Versendet");
   const rate = Number(settings.data?.default_hourly_rate ?? 120);
-  const rows = offerRows(quoted, materials.data ?? [], markup);
+  const rows = offerRows(quoted, materials.data ?? [], markup, job.offer_text_rows);
   const texts = (job.offer_rubric_texts && typeof job.offer_rubric_texts === "object" && !Array.isArray(job.offer_rubric_texts) ? job.offer_rubric_texts : {}) as Record<string, string>;
   const exclusions = effectiveExclusions(job.offer_exclusions, settings.data?.offer_exclusions);
   const itemized = job.offer_pricing_mode === "itemized";
@@ -233,7 +234,7 @@ function OffertePdfActions({
   const filename = `Offerte_${nr}_${(job.title || "Projekt").replace(/[^\w\-äöüÄÖÜ]+/g, "_")}`;
   const contact = c ? [c.first_name, c.last_name].filter(Boolean).join(" ") : "";
   const custLines = c ? [c.company_name, contact, c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
-  const groups = groupByRubric(rows.filter((r) => r.kind === "material" || (r.amount ?? 0) > 0), (r) => r.amount ?? 0);
+  const groups = groupByRubric(rows.filter((r) => r.kind === "text" || r.kind === "heading" || r.kind === "material" || (r.amount ?? 0) > 0), (r) => r.amount ?? 0);
 
   async function run(mode: "download" | "mail") {
     if (!ref.current) return;
@@ -310,17 +311,19 @@ function OffertePdfActions({
                   <div key={rg.rubric.code} className="of-rub">
                     {!single && <h3 className="of-rub-h"><span>{rg.rubric.code}</span>{rg.rubric.title}</h3>}
                     {texts[rg.rubric.code]?.trim() && <p className="of-text">{texts[rg.rubric.code]}</p>}
-                    {(itemized || !texts[rg.rubric.code]?.trim()) && (
-                      <table className="sr-table of-items"><tbody>
-                        {rg.items.map((r) => (
-                          <tr key={r.id}>
-                            <td>{r.description || "–"}</td>
-                            <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
-                            {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
-                          </tr>
-                        ))}
-                      </tbody></table>
-                    )}
+                    {rg.items.map((r) => {
+                      if (r.kind === "heading") return <h4 key={r.id} className="of-free-h">{r.description}</h4>;
+                      if (r.kind === "text") return <p key={r.id} className="of-free-text">{r.description}</p>;
+                      if (!itemized && texts[rg.rubric.code]?.trim()) return null;
+                      return (
+                        <table key={r.id} className="sr-table of-items"><tbody><tr>
+                          <td>{r.description || "–"}</td>
+                          <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
+                          {itemized && <td className="num">{r.row.discount > 0 ? `−${Number(r.row.discount).toLocaleString("de-CH")} %` : ""}</td>}
+                          {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
+                        </tr></tbody></table>
+                      );
+                    })}
                     <div className="of-sum"><span>Total {rg.rubric.code} {rg.rubric.title}</span><span>{formatCHF(rg.total)}</span></div>
                   </div>
                 ))}
@@ -337,6 +340,8 @@ function OffertePdfActions({
           <div className="sr-tot">
             <h3>Zusammenfassung</h3>
             <table><tbody>
+              {totals.discountTotal > 0 && <tr><td>Zwischensumme vor Rabatt:</td><td className="num">{formatCHF(totals.subtotalBeforeDiscount)}</td></tr>}
+              {totals.discountTotal > 0 && <tr><td>Rabatt:</td><td className="num">−{formatCHF(totals.discountTotal)}</td></tr>}
               <tr><td>Zwischensumme netto:</td><td className="num">{formatCHF(totals.subtotal)}</td></tr>
               <tr><td>MWST {vatRate}%:</td><td className="num">{formatCHF(totals.vat)}</td></tr>
               <tr className="grand"><td>Totalbetrag inkl. MWST:</td><td className="num">{formatCHF(round5(totals.total))}</td></tr>

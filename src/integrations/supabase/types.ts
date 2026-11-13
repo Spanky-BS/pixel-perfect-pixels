@@ -408,6 +408,7 @@ export type Database = {
           offer_exclusions: Json | null
           offer_pricing_mode: string
           offer_rubric_texts: Json
+          offer_text_rows: Json
           problem_description: string | null
           report_created_at: string | null
           report_number: string | null
@@ -438,6 +439,7 @@ export type Database = {
           offer_exclusions?: Json | null
           offer_pricing_mode?: string
           offer_rubric_texts?: Json
+          offer_text_rows?: Json
           problem_description?: string | null
           report_created_at?: string | null
           report_number?: string | null
@@ -468,6 +470,7 @@ export type Database = {
           offer_exclusions?: Json | null
           offer_pricing_mode?: string
           offer_rubric_texts?: Json
+          offer_text_rows?: Json
           problem_description?: string | null
           report_created_at?: string | null
           report_number?: string | null
@@ -495,6 +498,7 @@ export type Database = {
           confidence: string | null
           created_at: string
           description: string
+          discount: number
           hourly_rate: number
           hours: number
           id: string
@@ -513,6 +517,7 @@ export type Database = {
           confidence?: string | null
           created_at?: string
           description?: string
+          discount?: number
           hourly_rate?: number
           hours?: number
           id?: string
@@ -531,6 +536,7 @@ export type Database = {
           confidence?: string | null
           created_at?: string
           description?: string
+          discount?: number
           hourly_rate?: number
           hours?: number
           id?: string
@@ -651,6 +657,7 @@ export type Database = {
           created_at: string
           description: string
           dimensions: string | null
+          discount: number
           finish: string | null
           id: string
           job_id: string
@@ -673,6 +680,7 @@ export type Database = {
           created_at?: string
           description?: string
           dimensions?: string | null
+          discount?: number
           finish?: string | null
           id?: string
           job_id: string
@@ -695,6 +703,7 @@ export type Database = {
           created_at?: string
           description?: string
           dimensions?: string | null
+          discount?: number
           finish?: string | null
           id?: string
           job_id?: string

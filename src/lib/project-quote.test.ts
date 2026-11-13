@@ -27,6 +27,36 @@ describe("project quote helpers", () => {
     expect(normalizeStatus("project", "Produktauswahl")).toBe("Offerte");
   });
 
+  it("applies labour discounts to quote totals", () => {
+    const t = computeQuote(
+      [{ hours: 2, hourly_rate: 100, discount: 10, source: "manual" } as Labour],
+      [],
+      8.1,
+      0,
+    );
+    expect(t.labourTotal).toBe(180);
+    expect(t.subtotal).toBe(180);
+    expect(t.discountTotal).toBe(20);
+    expect(t.vat).toBe(14.58);
+  });
+
+  it("applies material discounts before VAT", () => {
+    const t = computeQuote(
+      [],
+      [{
+        quantity: 2,
+        discount: 25,
+        products: { purchase_price: 40, sales_price: 100, markup_percent: null },
+      } as never],
+      8.1,
+      0,
+    );
+    expect(t.materialTotal).toBe(150);
+    expect(t.subtotalBeforeDiscount).toBe(200);
+    expect(t.discountTotal).toBe(50);
+    expect(t.vat).toBe(12.15);
+  });
+
   it("computes quote totals from quoted labour only", () => {
     const t = computeQuote(
       [

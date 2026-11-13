@@ -1,4 +1,5 @@
 import { isQuotedLabour, type Labour, type Material } from "@/lib/app";
+import { discountedAmount } from "@/lib/discount";
 import { unitSalesPrice, type Product } from "@/lib/products";
 
 export function linkedProduct(row: { products?: Product | Product[] | null }): Product | null {
@@ -7,8 +8,8 @@ export function linkedProduct(row: { products?: Product | Product[] | null }): P
   return Array.isArray(p) ? p[0] ?? null : p;
 }
 
-export function labourQuoteAmount(l: Pick<Labour, "hours" | "hourly_rate">) {
-  return Number(l.hours) * Number(l.hourly_rate);
+export function labourQuoteAmount(l: Pick<Labour, "hours" | "hourly_rate" | "discount">) {
+  return discountedAmount(Number(l.hours) * Number(l.hourly_rate), l.discount);
 }
 
 export function quotedLabour(list: Labour[] | null | undefined) {
@@ -24,6 +25,8 @@ export type QuoteTotals = {
   labourTotal: number;
   materialTotal: number;
   unpriced: number;
+  subtotalBeforeDiscount: number;
+  discountTotal: number;
   subtotal: number;
   vat: number;
   total: number;
@@ -45,16 +48,25 @@ export function computeQuote(
     const p = linkedProduct(m);
     const qty = Number(m.quantity);
     const vk = p ? unitSalesPrice(p, fallbackMarkup) : null;
-    if (vk != null) materialTotal += vk * qty;
+    if (vk != null) materialTotal += discountedAmount(vk * qty, m.discount);
     else unpriced += 1;
   });
   const subtotal = labourTotal + materialTotal;
+  const labourBeforeDiscount = lab.reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
+  const materialBeforeDiscount = (materials ?? []).reduce((sum, m) => {
+    const p = linkedProduct(m);
+    const vk = p ? unitSalesPrice(p, fallbackMarkup) : null;
+    return sum + (vk != null ? vk * Number(m.quantity) : 0);
+  }, 0);
+  const subtotalBeforeDiscount = labourBeforeDiscount + materialBeforeDiscount;
   const vat = Math.round(subtotal * vatRate) / 100;
   return {
     hours,
     labourTotal,
     materialTotal,
     unpriced,
+    subtotalBeforeDiscount,
+    discountTotal: subtotalBeforeDiscount - subtotal,
     subtotal,
     vat,
     total: subtotal + vat,
