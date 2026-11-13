@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, ChevronRight, FileText, Plus, Tag, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, FileText, Loader2, MoreHorizontal, Plus, Sparkles, Tag, Trash2, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { generateRubricText } from "@/lib/ai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCHF, type Labour, type Material } from "@/lib/app";
@@ -80,6 +83,14 @@ export function OfferRubrics({
     refresh();
   }
 
+  async function setQty(r: OfferRow, v: number) {
+    const { error } = r.kind === "arbeit"
+      ? await supabase.from("labour_items").update({ hours: v }).eq("id", r.id)
+      : await supabase.from("material_requirements").update({ quantity: v }).eq("id", r.id);
+    if (error) return toast.error(error.message);
+    refresh();
+  }
+
   async function remove(r: OfferRow) {
     if (!confirm(`«${r.description || "Position"}» löschen?`)) return;
     const { error } = await supabase.from(table(r) as "labour_items").delete().eq("id", r.id);
@@ -100,39 +111,41 @@ export function OfferRubrics({
               <span className="shrink-0 text-sm font-semibold tabular">{formatCHF(total)}</span>
             </div>
             <div className="list-group">
-              <RubricText code={rub.code} value={texts[rub.code] ?? ""} template={rub.template} locked={locked} onSave={(v) => setText(rub.code, v)} />
-              {list.map((r, i) => (
-                <div key={r.id} className="flex min-h-14 items-center gap-2 px-3 py-2">
-                  {!locked && (
-                    <div className="flex shrink-0 flex-col">
-                      <button aria-label="Nach oben" disabled={i === 0} onClick={() => void shift(list, i, -1)} className="flex h-6 w-7 items-center justify-center text-muted-foreground disabled:opacity-30"><ArrowUp className="h-3.5 w-3.5" /></button>
-                      <button aria-label="Nach unten" disabled={i === list.length - 1} onClick={() => void shift(list, i, 1)} className="flex h-6 w-7 items-center justify-center text-muted-foreground disabled:opacity-30"><ArrowDown className="h-3.5 w-3.5" /></button>
-                    </div>
-                  )}
-                  <button type="button" disabled={locked} onClick={() => (r.kind === "arbeit" ? onEditLabour(r.row) : onEditMaterial(r.row))} className="min-w-0 flex-1 text-left">
-                    <div className="truncate text-[15px]">{r.description || "–"}</div>
-                    <div className="text-xs text-muted-foreground tabular">
-                      {r.kind === "arbeit"
-                        ? (Number(r.row.hours) > 0 ? `${Number(r.row.hours).toLocaleString("de-CH")} h × ${formatCHF(Number(r.row.hourly_rate))}` : <span className="font-medium text-warning">Stunden offen</span>)
-                        : `Material · ${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}
-                    </div>
-                  </button>
-                  {r.kind === "material" && r.amount == null ? (
-                    <button type="button" disabled={locked} onClick={() => onPickProduct(r.row)} className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-3 text-xs font-medium"><Tag className="h-3.5 w-3.5" /> Produkt</button>
-                  ) : (
-                    <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(r.amount ?? 0)}</span>
-                  )}
-                  {!locked && (
-                    <>
-                      <select aria-label="Rubrik wechseln" value={rubricOf(r)} onChange={(e) => void moveTo(r, e.target.value)} className="h-9 w-14 shrink-0 rounded-lg border border-border bg-card px-1 text-xs tabular">
-                        {RUBRICS.map((x) => <option key={x.code} value={x.code}>{x.code} {x.title}</option>)}
-                      </select>
-                      <button aria-label="Löschen" onClick={() => void remove(r)} className="flex h-9 w-8 shrink-0 items-center justify-center text-muted-foreground"><Trash2 className="h-4 w-4" /></button>
-                    </>
-                  )}
-                  {locked && <ChevronRight className="hidden" />}
+              <RubricText code={rub.code} title={rub.title} positions={list.map(positionLine)} value={texts[rub.code] ?? ""} template={rub.template} locked={locked} onSave={(v) => setText(rub.code, v)} />
+              {list.length > 0 && (
+                <div className="hidden grid-cols-[1fr_88px_110px_110px_76px] gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:grid">
+                  <span>Bezeichnung</span><span className="text-right">Menge</span><span className="text-right">Einzelpreis</span><span className="text-right">Total</span><span />
                 </div>
-              ))}
+              )}
+              {list.map((r, i) => {
+                const qty = r.kind === "arbeit" ? Number(r.row.hours) : Number(r.row.quantity);
+                const unit = r.kind === "arbeit" ? "h" : r.row.unit;
+                const each = r.kind === "arbeit" ? Number(r.row.hourly_rate) : (r.amount != null && qty > 0 ? r.amount / qty : null);
+                return (
+                  <div key={r.id} className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 px-3 py-2 sm:grid-cols-[1fr_88px_110px_110px_76px]">
+                    <button type="button" disabled={locked} onClick={() => (r.kind === "arbeit" ? onEditLabour(r.row) : onEditMaterial(r.row))} className="col-span-2 min-w-0 text-left sm:col-span-1">
+                      <div className="truncate text-[14px]">{r.description || "–"}</div>
+                      <div className="text-[11px] text-muted-foreground">{r.kind === "arbeit" ? "Arbeit" : "Material"}</div>
+                    </button>
+                    <QtyInput value={qty} unit={unit} locked={locked} onSave={(v) => void setQty(r, v)} />
+                    <span className="hidden text-right text-sm text-muted-foreground tabular sm:block">{each != null ? formatCHF(each) : "–"}</span>
+                    {r.kind === "material" && r.amount == null ? (
+                      <button type="button" disabled={locked} onClick={() => onPickProduct(r.row)} className="flex h-8 items-center justify-center gap-1 justify-self-end rounded-full border border-warning/60 bg-warning/10 px-3 text-xs font-medium"><Tag className="h-3.5 w-3.5" /> Produkt</button>
+                    ) : (
+                      <span className="text-right text-[14px] font-semibold tabular">{formatCHF(r.amount ?? 0)}</span>
+                    )}
+                    {!locked ? (
+                      <div className="col-span-2 flex items-center justify-end gap-0.5 sm:col-span-1">
+                        <RowMenu
+                          canUp={i > 0} canDown={i < list.length - 1} rubric={rubricOf(r)}
+                          onUp={() => void shift(list, i, -1)} onDown={() => void shift(list, i, 1)}
+                          onMove={(c) => void moveTo(r, c)} onDelete={() => void remove(r)}
+                        />
+                      </div>
+                    ) : <span className="hidden sm:block" />}
+                  </div>
+                );
+              })}
               {!locked && (
                 <div className="grid grid-cols-2 divide-x divide-border">
                   <button type="button" onClick={() => onEditLabour({ job_id: jobId, hours: 1, hourly_rate: rate, rubric: rub.code })} className="flex h-11 items-center justify-center gap-1 text-sm font-medium text-primary active:bg-muted"><Plus className="h-4 w-4" /> Arbeit</button>
@@ -173,29 +186,101 @@ export function OfferRubrics({
   );
 }
 
-function RubricText({ code, value, template, locked, onSave }: { code: string; value: string; template: string; locked: boolean; onSave: (v: string) => void }) {
+function positionLine(r: OfferRow) {
+  return r.kind === "arbeit"
+    ? `Arbeit: ${r.description}`
+    : `Material: ${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit} ${r.description}`;
+}
+
+function QtyInput({ value, unit, locked, onSave }: { value: number; unit: string; locked: boolean; onSave: (v: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const n = Number(draft.replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) return setDraft(String(value));
+    if (n !== value) onSave(n);
+  };
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <input
+        aria-label="Menge" inputMode="decimal" disabled={locked} value={draft}
+        onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+        className="h-8 w-14 rounded-md border border-border bg-card px-1.5 text-right text-sm tabular disabled:border-transparent"
+      />
+      <span className="w-6 text-xs text-muted-foreground">{unit}</span>
+    </div>
+  );
+}
+
+function RowMenu({ canUp, canDown, rubric, onUp, onDown, onMove, onDelete }: {
+  canUp: boolean; canDown: boolean; rubric: string;
+  onUp: () => void; onDown: () => void; onMove: (code: string) => void; onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger aria-label="Aktionen" className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"><MoreHorizontal className="h-4 w-4" /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 w-60 overflow-y-auto">
+        <DropdownMenuItem disabled={!canUp} onClick={onUp}><ArrowUp className="mr-2 h-4 w-4" /> Nach oben</DropdownMenuItem>
+        <DropdownMenuItem disabled={!canDown} onClick={onDown}><ArrowDown className="mr-2 h-4 w-4" /> Nach unten</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Verschieben nach</DropdownMenuLabel>
+        {RUBRICS.filter((x) => x.code !== rubric).map((x) => (
+          <DropdownMenuItem key={x.code} onClick={() => onMove(x.code)} className="text-xs"><span className="mr-2 tabular text-muted-foreground">{x.code}</span>{x.title}</DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onDelete} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Löschen</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function RubricText({ code, title, positions, value, template, locked, onSave }: { code: string; title: string; positions: string[]; value: string; template: string; locked: boolean; onSave: (v: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [busy, setBusy] = useState(false);
+  const generate = useServerFn(generateRubricText);
+  async function runAi() {
+    if (positions.length === 0) return toast.error("Zuerst Positionen erfassen");
+    setBusy(true);
+    try {
+      const { text } = await generate({ data: { rubric: `${code} ${title}`, positions } });
+      setDraft(text);
+      setEditing(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "KI-Text fehlgeschlagen");
+    } finally { setBusy(false); }
+  }
+  const aiBtn = !locked && (
+    <button type="button" onClick={() => void runAi()} disabled={busy} className="flex h-9 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-3 text-xs font-semibold text-primary disabled:opacity-60">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+      {busy ? "Schreibt…" : value || editing ? "Neu mit KI" : "KI-Beschrieb"}
+    </button>
+  );
   if (editing) {
     return (
-      <div className="space-y-2 px-3 py-3">
-        <Textarea autoFocus rows={6} value={draft} onChange={(e) => setDraft(e.target.value)} className="text-sm" placeholder={`Leistungsbeschrieb ${code}`} />
-        <div className="flex gap-2">
-          <button onClick={() => setDraft(draft.trim() ? `${draft}\n${template}` : template)} className="h-10 rounded-lg border border-border px-3 text-sm">Vorlage einfügen</button>
+      <div className="space-y-2 border-b border-border bg-muted/20 px-3 py-3">
+        <Textarea autoFocus rows={5} value={draft} onChange={(e) => setDraft(e.target.value)} className="text-sm" placeholder={`Leistungsbeschrieb ${code}`} />
+        <div className="flex flex-wrap gap-2">
+          {aiBtn}
+          <button onClick={() => setDraft(template)} className="h-9 rounded-lg border border-border px-3 text-xs">Vorlage</button>
           <div className="flex-1" />
-          <button onClick={() => { setDraft(value); setEditing(false); }} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border"><X className="h-4 w-4" /></button>
-          <button onClick={() => { onSave(draft.trim()); setEditing(false); }} className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Speichern</button>
+          <button onClick={() => { setDraft(value); setEditing(false); }} className="flex h-9 w-9 items-center justify-center rounded-lg border border-border"><X className="h-4 w-4" /></button>
+          <button onClick={() => { onSave(draft.trim()); setEditing(false); }} className="h-9 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Speichern</button>
         </div>
       </div>
     );
   }
   return (
-    <button type="button" disabled={locked} onClick={() => { setDraft(value || template); setEditing(true); }} className="flex w-full gap-2 px-4 py-3 text-left">
-      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-      {value
-        ? <span className="line-clamp-3 whitespace-pre-line text-sm text-muted-foreground">{value}</span>
-        : <span className="text-sm text-primary">{locked ? "Kein Leistungsbeschrieb" : "Leistungsbeschrieb hinzufügen (Vorlage)"}</span>}
-    </button>
+    <div className="flex items-start gap-2 border-b border-border bg-muted/20 px-3 py-3">
+      <button type="button" disabled={locked} onClick={() => { setDraft(value || template); setEditing(true); }} className="flex min-w-0 flex-1 gap-2 text-left">
+        <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        {value
+          ? <span className="line-clamp-4 whitespace-pre-line text-sm">{value}</span>
+          : <span className="text-sm text-muted-foreground">{locked ? "Kein Leistungsbeschrieb" : "Leistungsbeschrieb für den Kunden – antippen oder mit KI erstellen"}</span>}
+      </button>
+      {aiBtn}
+    </div>
   );
 }
 

@@ -312,14 +312,14 @@ function OffertePdfActions({
                     {texts[rg.rubric.code]?.trim() && <p style={{ whiteSpace: "pre-line", margin: "2px 0 6px" }}>{texts[rg.rubric.code]}</p>}
                     <table className="sr-table">
                       <tbody>
-                        {rg.items.map((r) => (
+                        {(itemized || !texts[rg.rubric.code]?.trim()) && rg.items.map((r) => (
                           <tr key={r.id}>
                             <td>{r.description || "–"}</td>
                             <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
                             {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
                           </tr>
                         ))}
-                        {!itemized && <tr><td><strong>{rg.rubric.title}</strong></td><td className="num">1.00 LE</td></tr>}
+                        {!itemized && <tr><td><strong>{rg.rubric.title}</strong> &nbsp;1.00 LE</td><td className="num">{formatCHF(rg.total)}</td></tr>}
                       </tbody>
                       <tfoot><tr><td colSpan={itemized ? 2 : 1}>{rg.rubric.code} Total {rg.rubric.title}</td><td className="num">{formatCHF(rg.total)}</td></tr></tfoot>
                     </table>

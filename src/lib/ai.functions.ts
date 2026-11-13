@@ -491,3 +491,25 @@ export const extractProjectExecution = createServerFn({ method: "POST" })
 
     return { labour, material };
   });
+
+const RUBRIC_TEXT_SYSTEM = `Du bist ein Schweizer Sanitärinstallateur und schreibst den Leistungsbeschrieb einer Offerten-Rubrik für den Kunden.
+Schreibe 2-4 sachliche Sätze im Stil "Liefern und Montieren von ...", basierend NUR auf den gegebenen Positionen.
+Nenne wichtige Produkte (Marke/Modell, wenn vorhanden) und die Arbeiten zusammengefasst. Keine Preise, keine Stückpreise, keine Stunden, keine Aufzählungsliste.
+Erfinde keine technischen Details. Schweizer Deutsch ohne ß. Antworte nur mit dem Text.`;
+
+export const generateRubricText = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    rubric: z.string().max(200),
+    positions: z.array(z.string().max(300)).max(80),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    if (data.positions.length === 0) throw new Error("Keine Positionen in dieser Rubrik");
+    const { text } = await completeChat({
+      system: RUBRIC_TEXT_SYSTEM,
+      userContent: [{ type: "text", text: `Rubrik: ${data.rubric}\nPositionen:\n${data.positions.map((p) => `- ${p}`).join("\n")}` }],
+    });
+    const out = (text ?? "").trim();
+    if (!out) throw new Error("Kein Text erhalten");
+    return { text: out };
+  });
