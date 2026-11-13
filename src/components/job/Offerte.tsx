@@ -304,28 +304,27 @@ function OffertePdfActions({
           {groups.map((g) => {
             const single = g.rubrics.length === 1 && g.rubrics[0]!.rubric.code === g.group;
             return (
-              <section key={g.group} className="sr-sec">
-                {!single && <h3 style={{ fontSize: 13 }}>{g.group} &nbsp; {g.title}</h3>}
+              <section key={g.group} className="of-group">
+                <h2 className="of-group-h"><span>{g.group}</span>{g.title}</h2>
                 {g.rubrics.map((rg) => (
-                  <div key={rg.rubric.code} style={{ marginBottom: 10, breakInside: "avoid" }}>
-                    <h3>{rg.rubric.code} &nbsp; {rg.rubric.title}</h3>
-                    {texts[rg.rubric.code]?.trim() && <p style={{ whiteSpace: "pre-line", margin: "2px 0 6px" }}>{texts[rg.rubric.code]}</p>}
-                    <table className="sr-table">
-                      <tbody>
-                        {(itemized || !texts[rg.rubric.code]?.trim()) && rg.items.map((r) => (
+                  <div key={rg.rubric.code} className="of-rub">
+                    {!single && <h3 className="of-rub-h"><span>{rg.rubric.code}</span>{rg.rubric.title}</h3>}
+                    {texts[rg.rubric.code]?.trim() && <p className="of-text">{texts[rg.rubric.code]}</p>}
+                    {(itemized || !texts[rg.rubric.code]?.trim()) && (
+                      <table className="sr-table of-items"><tbody>
+                        {rg.items.map((r) => (
                           <tr key={r.id}>
                             <td>{r.description || "–"}</td>
                             <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
                             {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
                           </tr>
                         ))}
-                        {!itemized && <tr><td><strong>{rg.rubric.title}</strong> &nbsp;1.00 LE</td><td className="num">{formatCHF(rg.total)}</td></tr>}
-                      </tbody>
-                      <tfoot><tr><td colSpan={itemized ? 2 : 1}>{rg.rubric.code} Total {rg.rubric.title}</td><td className="num">{formatCHF(rg.total)}</td></tr></tfoot>
-                    </table>
+                      </tbody></table>
+                    )}
+                    <div className="of-sum"><span>Total {rg.rubric.code} {rg.rubric.title}</span><span>{formatCHF(rg.total)}</span></div>
                   </div>
                 ))}
-                {!single && <table className="sr-table"><tfoot><tr><td>{g.group} Total {g.title}</td><td className="num">{formatCHF(g.total)}</td></tr></tfoot></table>}
+                {!single && <div className="of-gsum"><span>Total {g.group} {g.title}</span><span>{formatCHF(g.total)}</span></div>}
               </section>
             );
           })}
