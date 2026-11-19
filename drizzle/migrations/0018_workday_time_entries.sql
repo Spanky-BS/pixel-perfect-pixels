@@ -1,0 +1,1 @@
+ALTER TABLE public.labour_time_entries ALTER COLUMN labour_item_id DROP NOT NULL;

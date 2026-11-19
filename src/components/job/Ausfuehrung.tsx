@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Camera, Check, FileText, Mic, Sparkles, Trash2, X } from "lucide-react";
+import { Camera, Check, FileText, Mic, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,8 @@ import {
   type Material,
 } from "@/lib/app";
 import { extraLabour, quotedLabour } from "@/lib/project-quote";
-import { groupByRubric } from "@/lib/rubrics";
+import { SupplierSearch } from "@/components/job/SupplierSearch";
+import { addCatalogHitAsExtraMaterial } from "@/lib/suppliers/add-to-offer";
 
 export function useTimeEntries(jobId: string) {
   return useQuery({
@@ -57,7 +58,8 @@ export function AusfuehrungWorkspace({
   const extra = extraLabour(labour.data);
   const entries = times.data ?? [];
   const technician = defaultTechnician(settings.data);
-  const [timeFor, setTimeFor] = useState<Labour | "extra" | null>(null);
+  const [timeFor, setTimeFor] = useState<"day" | "extra" | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [actualQty, setActualQty] = useState<Record<string, string>>({});
 
   function entriesFor(id: string) {
@@ -77,139 +79,130 @@ export function AusfuehrungWorkspace({
     toast.success("Ist-Menge gespeichert");
   }
 
+  const quotedHours = quoted.reduce((s, l) => s + Number(l.hours), 0);
+  const workedHours = entries.reduce((s, e) => s + Number(e.hours), 0);
+  const diff = workedHours - quotedHours;
+  const offerMaterials = (materials.data ?? []).filter((m) => m.source !== EXECUTION_SOURCE);
+  const extraMaterials = (materials.data ?? []).filter((m) => m.source === EXECUTION_SOURCE);
+  const extraIds = new Set(extra.map((l) => l.id));
+  const fmtH = (n: number) => `${n.toLocaleString("de-CH", { maximumFractionDigits: 2 })} h`;
+
+  async function removeEntry(id: string) {
+    await supabase.from("labour_time_entries").delete().eq("id", id);
+    qc.invalidateQueries({ queryKey: ["labour_time_entries", jobId] });
+  }
+
+  async function removeMaterial(id: string) {
+    if (!confirm("Zusatzmaterial entfernen?")) return;
+    await supabase.from("material_requirements").delete().eq("id", id);
+    qc.invalidateQueries({ queryKey: ["materials", jobId] });
+  }
+
+  const qtyEditor = (m: Material) => (
+    <div className="flex items-center gap-2">
+      <Input
+        aria-label={`Menge ${m.description}`}
+        className="h-11 w-20 text-right text-base tabular"
+        type="number"
+        inputMode="decimal"
+        value={actualQty[m.id] ?? String(m.actual_quantity ?? m.quantity)}
+        onChange={(e) => setActualQty((s) => ({ ...s, [m.id]: e.target.value }))}
+        onBlur={() => actualQty[m.id] != null && actualQty[m.id] !== String(m.actual_quantity ?? m.quantity) && void saveActualQty(m)}
+      />
+      <span className="w-8 text-sm text-muted-foreground">{m.unit}</span>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold">Ausführung</h2>
-        <p className="mt-0.5 text-sm text-muted-foreground">SOLL aus der bestätigten Offerte – IST vor Ort erfassen.</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">Arbeitszeit pro Einsatz erfassen. Verrechnet wird die Offerte – nachverrechnet nur Zusatzarbeit und Zusatzmaterial.</p>
       </div>
 
-      <ProjectExecutionCapture jobId={jobId} onPhotoFiles={onPhotoFiles} />
-
-      <section className="space-y-2">
-        <h3 className="text-base font-semibold">Offertpositionen / Arbeiten</h3>
-        {!quoted.length && <p className="rounded-lg border border-dashed bg-card p-4 text-sm text-muted-foreground">Keine Offertpositionen. Bitte zuerst die Offerte bestätigen.</p>}
-        {groupByRubric(quoted, () => 0).flatMap((g) => g.rubrics).flatMap((rg) => rg.items.map((l, i) => ({ l, rg, first: i === 0 }))).map(({ l, rg, first }) => {
-          const ist = istHours(l.id);
-          const rows = entriesFor(l.id);
-          return (
-            <article key={l.id} className={`rounded-lg border border-border/80 bg-card px-3 py-3 ${first ? "mt-4" : ""}`}>
-              {first && <p className="mb-1 text-xs font-semibold text-primary"><span className="tabular">{rg.rubric.code}</span> {rg.rubric.title}</p>}
-              <p className="font-semibold uppercase tracking-wide">{l.description || "–"}</p>
-              {l.notes?.trim() && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{l.notes}</p>}
-              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                <div className="rounded-md bg-muted px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Offerte</p>
-                  <p className="font-medium">{Number(l.hours).toLocaleString("de-CH")} h</p>
-                </div>
-                <div className="rounded-md bg-muted px-3 py-2">
-                  <p className="text-xs text-muted-foreground">IST</p>
-                  <p className="font-medium">{ist.toLocaleString("de-CH")} h</p>
-                </div>
-              </div>
-              {rows.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm">
-                  {rows.map((e) => (
-                    <li key={e.id} className="flex items-start justify-between gap-2">
-                      <span className="text-muted-foreground">
-                        {e.worked_on ? formatDate(e.worked_on) : "Ohne Datum"} · {e.technician || technician} · {Number(e.hours).toLocaleString("de-CH")} h
-                        {e.notes?.trim() ? ` – ${e.notes}` : ""}
-                      </span>
-                      <button
-                        type="button"
-                        aria-label="Eintrag löschen"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center text-destructive"
-                        onClick={async () => {
-                          await supabase.from("labour_time_entries").delete().eq("id", e.id);
-                          qc.invalidateQueries({ queryKey: ["labour_time_entries", jobId] });
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <button type="button" className="mt-2 inline-flex h-11 items-center text-sm font-medium text-primary" onClick={() => setTimeFor(l)}>
-                + IST-Stunden
-              </button>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="min-w-0 flex-1 text-base font-semibold leading-snug">Zusätzlich ausgeführte Arbeiten</h3>
-          <button type="button" className="inline-flex h-10 shrink-0 items-center text-sm font-medium text-primary" onClick={() => setTimeFor("extra")}>
-            + Hinzufügen
-          </button>
+      <section className="grid grid-cols-3 gap-2 rounded-xl border bg-card p-3 text-center">
+        <div><p className="text-xs text-muted-foreground">Offeriert</p><p className="text-lg font-semibold tabular">{fmtH(quotedHours)}</p></div>
+        <div><p className="text-xs text-muted-foreground">Gearbeitet</p><p className="text-lg font-semibold tabular">{fmtH(workedHours)}</p></div>
+        <div>
+          <p className="text-xs text-muted-foreground">Differenz</p>
+          <p className={`text-lg font-semibold tabular ${diff > 0 ? "text-destructive" : "text-primary"}`}>{diff > 0 ? "+" : ""}{fmtH(diff)}</p>
         </div>
-        {!extra.length && <p className="text-sm text-muted-foreground">Keine Zusatzarbeiten.</p>}
-        {extra.map((l) => {
-          const ist = istHours(l.id);
-          return (
-            <article key={l.id} className="rounded-lg border border-dashed border-primary/40 bg-card px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Zusatz</p>
-              <p className="font-semibold">{l.description || "–"}</p>
-              <p className="mt-1 text-sm">IST {ist.toLocaleString("de-CH")} h</p>
-              {entriesFor(l.id).map((e) => (
-                <p key={e.id} className="text-sm text-muted-foreground">
-                  {e.worked_on ? formatDate(e.worked_on) : "Ohne Datum"} · {e.technician || technician} · {Number(e.hours).toLocaleString("de-CH")} h
-                  {e.notes?.trim() ? ` – ${e.notes}` : ""}
-                </p>
-              ))}
-              <button type="button" className="mt-1 text-sm font-medium text-primary" onClick={() => setTimeFor(l)}>+ Zeit</button>
-            </article>
-          );
-        })}
       </section>
 
       <section className="space-y-2">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="text-base font-semibold">Material</h3>
-          <button
-            type="button"
-            className="inline-flex h-10 items-center text-sm font-medium text-primary"
-            onClick={() => onEditMaterial({ job_id: jobId, quantity: 1, unit: "Stk", status: "Offen", source: EXECUTION_SOURCE })}
-          >
-            + Hinzufügen
-          </button>
-        </div>
-        {(materials.data ?? []).map((m) => (
-          <article key={m.id} className="rounded-lg border border-border/80 bg-card px-3 py-3">
-            {m.source === EXECUTION_SOURCE && <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Zusatz</p>}
-            <p className="font-semibold">{m.description || "–"}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Offerte: {Number(m.quantity)} {m.unit}</p>
-            <div className="mt-2 flex items-end gap-2">
-              <Field label="IST-Menge">
-                <Input
-                  className="h-12 text-base"
-                  type="number"
-                  inputMode="decimal"
-                  value={actualQty[m.id] ?? (m.actual_quantity != null ? String(m.actual_quantity) : "")}
-                  onChange={(e) => setActualQty((s) => ({ ...s, [m.id]: e.target.value }))}
-                  placeholder={String(m.quantity)}
-                />
-              </Field>
-              <Button type="button" variant="outline" className="h-12 shrink-0" onClick={() => void saveActualQty(m)}>OK</Button>
-            </div>
-            {m.actual_quantity == null && (
-              <button
-                type="button"
-                className="mt-1 text-sm font-medium text-primary"
-                onClick={async () => {
-                  await supabase.from("material_requirements").update({ actual_quantity: Number(m.quantity) }).eq("id", m.id);
-                  qc.invalidateQueries({ queryKey: ["materials", jobId] });
-                }}
-              >
-                Wie Offerte übernehmen
-              </button>
-            )}
-          </article>
-        ))}
-        {!materials.data?.length && <MaterialList jobId={jobId} onEdit={onEditMaterial} />}
+        <Button className="h-14 w-full gap-2 text-base font-semibold" onClick={() => setTimeFor("day")}>
+          <Plus className="h-5 w-5" /> Arbeitszeit erfassen
+        </Button>
+        {!entries.length && <p className="text-sm text-muted-foreground">Noch keine Einsätze erfasst.</p>}
+        {entries.length > 0 && (
+          <ul className="divide-y rounded-xl border bg-card">
+            {[...entries].reverse().map((e) => (
+              <li key={e.id} className="flex items-start gap-3 px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    {e.worked_on ? formatDate(e.worked_on) : "Ohne Datum"} · {e.technician || technician} · <span className="tabular">{fmtH(Number(e.hours))}</span>
+                    {e.labour_item_id && extraIds.has(e.labour_item_id) && <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-[11px] font-semibold text-primary">Nachverrechnen</span>}
+                  </p>
+                  {(e.labour_item_id && extraIds.has(e.labour_item_id)) && <p className="text-sm">{extra.find((l) => l.id === e.labour_item_id)?.description}</p>}
+                  {e.notes?.trim() && <p className="text-sm text-muted-foreground">{e.notes}</p>}
+                </div>
+                <button type="button" aria-label="Eintrag löschen" className="flex h-10 w-10 shrink-0 items-center justify-center text-destructive" onClick={() => void removeEntry(e.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
+
+      <section className="space-y-3 rounded-xl border bg-card p-3">
+        <div>
+          <h3 className="text-base font-semibold">Nachverrechnen</h3>
+          <p className="text-sm text-muted-foreground">Nur grössere Zusatzarbeiten und Mehrmaterial – kommt auf die Schlussrechnung.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="h-12" onClick={() => setTimeFor("extra")}><Plus className="h-4 w-4" /> Zusatzarbeit</Button>
+          <Button variant="outline" className="h-12" onClick={() => setSearchOpen(true)}><Plus className="h-4 w-4" /> Zusatzmaterial</Button>
+        </div>
+        {extra.length > 0 && (
+          <ul className="divide-y rounded-lg border">
+            {extra.map((l) => (
+              <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                <span className="min-w-0 flex-1 font-medium">{l.description || "–"}</span>
+                <span className="tabular">{fmtH(istHours(l.id))}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {extraMaterials.length > 0 && (
+          <ul className="divide-y rounded-lg border">
+            {extraMaterials.map((m) => (
+              <li key={m.id} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 text-sm font-medium">{m.description || "–"}</span>
+                {qtyEditor(m)}
+                <button type="button" aria-label="Entfernen" className="flex h-10 w-8 items-center justify-center text-destructive" onClick={() => void removeMaterial(m.id)}><Trash2 className="h-4 w-4" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {offerMaterials.length > 0 && (
+        <details className="rounded-xl border bg-card">
+          <summary className="flex h-12 cursor-pointer items-center justify-between px-3 text-sm font-semibold">
+            <span>Material aus Offerte ({offerMaterials.length})</span>
+            <span className="text-xs font-normal text-muted-foreground">wie offeriert · nur Abweichungen ändern</span>
+          </summary>
+          <ul className="divide-y border-t">
+            {offerMaterials.map((m) => (
+              <li key={m.id} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 text-sm">{m.description || "–"}<span className="block text-xs text-muted-foreground">Offerte {Number(m.quantity)} {m.unit}</span></span>
+                {qtyEditor(m)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <section className="space-y-3">
         <button type="button" className="flex h-12 w-full items-center justify-center gap-2 rounded-lg border bg-card text-sm font-medium" onClick={onAddPhoto}>
@@ -220,10 +213,28 @@ export function AusfuehrungWorkspace({
         <DocumentList jobId={jobId} hideEmpty />
       </section>
 
+      <SupplierSearch
+        open={searchOpen}
+        title="Zusatzmaterial"
+        onClose={() => setSearchOpen(false)}
+        footer={
+          <button type="button" onClick={() => { setSearchOpen(false); onEditMaterial({ job_id: jobId, quantity: 0, actual_quantity: 1, unit: "Stk", status: "Offen", source: EXECUTION_SOURCE }); }} className="h-11 w-full rounded-xl border border-dashed border-border text-sm font-medium text-primary">Manuell erfassen (ohne Katalog)</button>
+        }
+        onPick={async (hit) => {
+          try {
+            await addCatalogHitAsExtraMaterial(jobId, hit, 1);
+            toast.success("Zusatzmaterial erfasst – Menge anpassen falls nötig");
+            qc.invalidateQueries({ queryKey: ["materials", jobId] });
+            setSearchOpen(false);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Übernehmen fehlgeschlagen");
+          }
+        }}
+      />
+
       {timeFor && (
         <TimeEntrySheet
           jobId={jobId}
-          labour={timeFor === "extra" ? null : timeFor}
           extra={timeFor === "extra"}
           technician={technician}
           onClose={() => setTimeFor(null)}
@@ -235,78 +246,83 @@ export function AusfuehrungWorkspace({
 
 function TimeEntrySheet({
   jobId,
-  labour,
   extra,
   technician,
   onClose,
 }: {
   jobId: string;
-  labour: Labour | null;
   extra: boolean;
   technician: string;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const [description, setDescription] = useState(labour?.description ?? "");
-  const [hours, setHours] = useState("1");
+  const [description, setDescription] = useState("");
+  const [hours, setHours] = useState(extra ? "1" : "8");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [tech, setTech] = useState(technician);
+  const [saving, setSaving] = useState(false);
 
   async function save() {
-    const h = Number(hours);
+    const h = Number(hours.replace(",", "."));
     if (!Number.isFinite(h) || h <= 0) return toast.error("Stunden angeben");
-    let labourId = labour?.id;
-    if (extra) {
-      if (!description.trim()) return toast.error("Beschreibung angeben");
-      const { data, error } = await supabase.from("labour_items").insert({
+    setSaving(true);
+    try {
+      let labourId: string | null = null;
+      if (extra) {
+        if (!description.trim()) return toast.error("Beschreibung angeben");
+        const { data, error } = await supabase.from("labour_items").insert({
+          job_id: jobId,
+          description: description.trim(),
+          hours: 0,
+          hourly_rate: 0,
+          notes: note.trim() || null,
+          source: EXECUTION_SOURCE,
+          sort_order: Date.now() % 1e9,
+        }).select("id").single();
+        if (error || !data) return toast.error(error?.message ?? "Speichern fehlgeschlagen");
+        labourId = data.id;
+      }
+      const { error } = await supabase.from("labour_time_entries").insert({
         job_id: jobId,
-        description: description.trim(),
-        hours: 0,
-        hourly_rate: 0,
+        labour_item_id: labourId,
+        hours: h,
         notes: note.trim() || null,
-        source: EXECUTION_SOURCE,
-        sort_order: Date.now() % 1e9,
-      }).select("id").single();
-      if (error || !data) return toast.error(error?.message ?? "Speichern fehlgeschlagen");
-      labourId = data.id;
+        technician: tech.trim() || technician,
+        worked_on: date || null,
+      });
+      if (error) return toast.error(error.message);
+      qc.invalidateQueries({ queryKey: ["labour", jobId] });
+      qc.invalidateQueries({ queryKey: ["labour_time_entries", jobId] });
+      toast.success(extra ? "Zusatzarbeit erfasst" : "Arbeitszeit erfasst");
+      onClose();
+    } finally {
+      setSaving(false);
     }
-    if (!labourId) return;
-    const { error } = await supabase.from("labour_time_entries").insert({
-      job_id: jobId,
-      labour_item_id: labourId,
-      hours: h,
-      notes: note.trim() || null,
-      technician: tech.trim() || technician,
-      worked_on: date || null,
-    });
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["labour", jobId] });
-    qc.invalidateQueries({ queryKey: ["labour_time_entries", jobId] });
-    onClose();
   }
 
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="bottom" className="rounded-t-2xl">
-        <SheetHeader><SheetTitle>{extra ? "Zusätzliche Arbeit" : "IST-Stunden"}</SheetTitle></SheetHeader>
+        <SheetHeader><SheetTitle>{extra ? "Zusatzarbeit nachverrechnen" : "Arbeitszeit erfassen"}</SheetTitle></SheetHeader>
         <div className="space-y-3 p-4 pt-0">
-          {labour && <p className="text-sm text-muted-foreground">{labour.description} · Offerte {Number(labour.hours).toLocaleString("de-CH")} h</p>}
-          {extra && <Field label="Beschreibung"><Input className="h-12 text-base" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="z.B. Zusatzleitung wegen Leitungsverlauf" /></Field>}
+          {extra && <Field label="Was wurde zusätzlich gemacht?"><Input className="h-12 text-base" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="z.B. Zusatzanschluss im Keller auf Kundenwunsch" /></Field>}
           <div className="grid grid-cols-2 gap-3">
-            <Field label="IST-Stunden"><Input className="h-12 text-base" type="number" inputMode="decimal" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
+            <Field label="Stunden"><Input className="h-12 text-base" type="number" inputMode="decimal" step="0.25" value={hours} onChange={(e) => setHours(e.target.value)} /></Field>
             <Field label="Datum"><Input className="h-12 text-base" type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           </div>
           <Field label="Techniker"><Input className="h-12 text-base" value={tech} onChange={(e) => setTech(e.target.value)} /></Field>
-          <Field label="Notiz (optional)"><Textarea className="min-h-20 text-base" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-          <Button className="h-12 w-full font-semibold" onClick={() => void save()}>Speichern</Button>
+          <Field label={extra ? "Notiz (optional)" : "Kurzer Rapport (optional)"}>
+            <Textarea className="min-h-20 text-base" value={note} onChange={(e) => setNote(e.target.value)} placeholder={extra ? "" : "z.B. Altes Bad demontiert, Vorwand gestellt"} />
+          </Field>
+          <Button className="h-12 w-full font-semibold" disabled={saving} onClick={() => void save()}>Speichern</Button>
         </div>
       </SheetContent>
     </Sheet>
   );
 }
 
-function ProjectExecutionCapture({
+export function ProjectExecutionCapture({
   jobId,
   onPhotoFiles,
 }: {

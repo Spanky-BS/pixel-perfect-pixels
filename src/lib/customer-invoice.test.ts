@@ -3,13 +3,14 @@ import { addDays, ibanStatus, invoiceLinesFromActuals, invoiceTotals, nextInvoic
 import { isQRReferenceValid } from "swissqrbill/utils";
 
 describe("customer invoice", () => {
-  it("bills effective hours and used material, not the offer", () => {
+  it("bills offered work as offered, extra work by booked hours, daily time stays internal", () => {
     const r = invoiceLinesFromActuals({
       labour: [
-        { id: "a", description: "Montage Pissoir", hourly_rate: 130 },
-        { id: "b", description: "Demontage", hourly_rate: 130 },
+        { id: "a", description: "Montage Pissoir", hourly_rate: 130, hours: 4, source: "ai" },
+        { id: "b", description: "Demontage", hourly_rate: 130, hours: 0, source: "ai" },
+        { id: "x", description: "Zusatzleitung", hourly_rate: 0, hours: 0, source: "execution" },
       ],
-      times: [{ labour_item_id: "a", hours: 2.5 }, { labour_item_id: "a", hours: 1.5 }],
+      times: [{ labour_item_id: "a", hours: 9 }, { labour_item_id: null, hours: 8 }, { labour_item_id: "x", hours: 1.5 }],
       materials: [
         { description: "Pissoir", unit: "Stk", quantity: 2, actual_quantity: 1, products: { sales_price: 400, purchase_price: null, markup: null } as never },
         { description: "Ohne Preis", unit: "Stk", quantity: 1, products: null },
@@ -19,9 +20,10 @@ describe("customer invoice", () => {
     });
     expect(r.lines).toEqual([
       { kind: "arbeit", rubric: "250", description: "Montage Pissoir", qty: 4, unit: "h", price: 130, amount: 520 },
+      { kind: "arbeit", rubric: expect.any(String), description: "Zusatzleitung", qty: 1.5, unit: "h", price: 120, amount: 180 },
       { kind: "material", rubric: "250", description: "Pissoir", qty: 1, unit: "Stk", price: 400, amount: 400 },
     ]);
-    expect(r.hours).toBe(4);
+    expect(r.hours).toBe(5.5);
     expect(r.unpriced).toBe(1);
   });
 

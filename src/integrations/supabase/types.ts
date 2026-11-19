@@ -578,7 +578,7 @@ export type Database = {
           hours: number
           id: string
           job_id: string
-          labour_item_id: string
+          labour_item_id: string | null
           notes: string | null
           start_at: string | null
           technician: string | null
@@ -591,7 +591,7 @@ export type Database = {
           hours?: number
           id?: string
           job_id: string
-          labour_item_id: string
+          labour_item_id?: string | null
           notes?: string | null
           start_at?: string | null
           technician?: string | null
@@ -604,7 +604,7 @@ export type Database = {
           hours?: number
           id?: string
           job_id?: string
-          labour_item_id?: string
+          labour_item_id?: string | null
           notes?: string | null
           start_at?: string | null
           technician?: string | null

@@ -33,7 +33,7 @@ export function Nachkalkulation({ jobId }: { jobId: string }) {
   const rateById = new Map(quoted.map((l) => [l.id, Number(l.hourly_rate)]));
   const istHours = (times.data ?? []).reduce((s, e) => s + Number(e.hours), 0);
   const istLabourCHF = (times.data ?? []).reduce((s, e) => {
-    const rate = rateById.get(e.labour_item_id) || defaultRate;
+    const rate = rateById.get(e.labour_item_id ?? "") || defaultRate;
     return s + Number(e.hours) * rate;
   }, 0);
   const hasIstLabour = (times.data ?? []).length > 0;

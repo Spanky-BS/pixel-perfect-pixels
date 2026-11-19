@@ -11,11 +11,15 @@ export const round2 = (n: number) => Math.round(n * 100) / 100;
 /** Swiss cash rounding to 5 Rappen. */
 export const round5 = (n: number) => Math.round(n * 20) / 20;
 
-type LabourIn = { id: string; description: string; rubric?: string | null; hourly_rate: number | string | null };
-type TimeIn = { labour_item_id: string; hours: number | string };
+type LabourIn = { id: string; description: string; rubric?: string | null; hourly_rate: number | string | null; hours?: number | string | null; source?: string | null };
+type TimeIn = { labour_item_id: string | null; hours: number | string };
 type MaterialIn = { description: string; rubric?: string | null; unit: string; quantity: number | string; actual_quantity?: number | string | null; products?: Product | Product[] | null };
 
-/** Project invoice = effective effort: booked hours from Ausführung and used material (Ist-Menge, else Offerte-Menge). */
+/**
+ * Project invoice: offered work is billed as offered (offer hours); only extra work recorded in
+ * Ausführung (source "execution") is billed by its booked hours. Daily work time without a position
+ * is internal (Nachkalkulation only). Material: Ist-Menge, else Offerte-Menge.
+ */
 export function invoiceLinesFromActuals(input: {
   labour: LabourIn[];
   times: TimeIn[];
@@ -26,7 +30,9 @@ export function invoiceLinesFromActuals(input: {
   const lines: InvoiceLine[] = [];
   let hours = 0;
   for (const l of input.labour) {
-    const h = input.times.filter((t) => t.labour_item_id === l.id).reduce((s, t) => s + Number(t.hours), 0);
+    const h = l.source === "execution"
+      ? input.times.filter((t) => t.labour_item_id === l.id).reduce((s, t) => s + Number(t.hours), 0)
+      : Number(l.hours ?? 0);
     if (h <= 0) continue;
     const rate = Number(l.hourly_rate) || input.defaultRate;
     hours += h;

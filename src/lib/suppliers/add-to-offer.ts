@@ -60,3 +60,22 @@ export async function addCatalogHitToOffer(jobId: string, rubric: string, hit: C
   });
   if (mErr) throw mErr;
 }
+
+/** Extra material used on site (not in the offer): snapshot the live article and add it as Ausführung material. */
+export async function addCatalogHitAsExtraMaterial(jobId: string, hit: CatalogHit, quantity: number) {
+  const { uid, product } = await snapshotHit(hit);
+  const { error } = await supabase.from("material_requirements").insert({
+    user_id: uid,
+    job_id: jobId,
+    description: hit.productName,
+    quantity: 0,
+    actual_quantity: quantity,
+    unit: hit.priceUnit ?? "Stk",
+    status: "Produkt ausgewählt",
+    product_id: product.id,
+    preferred_brand: hit.manufacturer,
+    source: "execution",
+    sort_order: Date.now() % 1e9,
+  });
+  if (error) throw error;
+}
