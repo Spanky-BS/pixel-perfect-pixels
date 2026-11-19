@@ -62,6 +62,17 @@ export function AusfuehrungWorkspace({
   const [searchOpen, setSearchOpen] = useState(false);
   const [actualQty, setActualQty] = useState<Record<string, string>>({});
 
+  async function removeExtraLabour(id: string) {
+    if (!confirm("Zusatzarbeit inkl. gebuchter Stunden entfernen?")) return;
+    const del = await supabase.from("labour_time_entries").delete().eq("labour_item_id", id);
+    if (del.error) return toast.error(del.error.message);
+    const { error } = await supabase.from("labour_items").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["labour", jobId] }),
+      qc.invalidateQueries({ queryKey: ["labour_time_entries", jobId] }),
+    ]);
+  }
   function entriesFor(id: string) {
     return entries.filter((e) => e.labour_item_id === id);
   }
@@ -170,6 +181,7 @@ export function AusfuehrungWorkspace({
               <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                 <span className="min-w-0 flex-1 font-medium">{l.description || "–"}</span>
                 <span className="tabular">{fmtH(istHours(l.id))}</span>
+                <button type="button" aria-label="Zusatzarbeit entfernen" className="flex h-10 w-8 items-center justify-center text-destructive" onClick={() => void removeExtraLabour(l.id)}><Trash2 className="h-4 w-4" /></button>
               </li>
             ))}
           </ul>
