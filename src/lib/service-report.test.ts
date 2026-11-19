@@ -29,6 +29,7 @@ const job = {
   report_created_at: "2026-10-06T17:50:00.000Z",
   offer_rubric_texts: {},
   offer_text_rows: [],
+  offer_discount_percent: 0,
   offer_exclusions: null,
   offer_pricing_mode: "rubric",
 };

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { discountedAmount, moveOfferRow, parseOfferTextRows } from "./offer-editor";
+import { discountedAmount } from "./discount";
+import { moveOfferRow, parseOfferTextRows } from "./offer-editor";
 
 describe("offer editor", () => {
-  it("applies a 10% position discount to the net amount", () => {
+  it("applies a 10% quote discount to the net amount", () => {
     expect(discountedAmount(200, 10)).toBe(180);
   });
 
-  it("supports a 100% discount and clamps invalid percentages", () => {
+  it("supports a 100% quote discount and clamps invalid percentages", () => {
     expect(discountedAmount(125, 100)).toBe(0);
     expect(discountedAmount(125, -5)).toBe(125);
     expect(discountedAmount(125, 110)).toBe(0);

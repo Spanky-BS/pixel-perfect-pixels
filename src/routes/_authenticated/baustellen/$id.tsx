@@ -242,7 +242,7 @@ function JobPage() {
             const vatRate = Number(settings.data?.vat_rate ?? 8.1);
             const { data: lab } = await supabase.from("labour_items").select("*").eq("job_id", id);
             const { data: mat } = await supabase.from("material_requirements").select("*, products(*)").eq("job_id", id);
-            const totals = computeQuote(lab ?? [], mat ?? [], vatRate, Number(settings.data?.default_material_markup ?? 0));
+            const totals = computeQuote(lab ?? [], mat ?? [], vatRate, Number(settings.data?.default_material_markup ?? 0), Number(j.offer_discount_percent));
             const { error: qErr } = await supabase.from("quotations").insert({
               job_id: id,
               status: "Bestätigt",
@@ -469,7 +469,7 @@ function AbrechnungStep({ job }: { job: Job & { customers?: Partial<Customer> | 
   return (
     <div className="space-y-4">
       <RechnungWorkspace job={job} />
-      <QuoteTotalsCard jobId={job.id} />
+      <QuoteTotalsCard jobId={job.id} offerDiscount={Number(job.offer_discount_percent)} />
       <SupplierInvoices jobId={job.id} />
       <Nachkalkulation jobId={job.id} />
     </div>

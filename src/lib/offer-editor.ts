@@ -1,8 +1,5 @@
 import type { Labour, Material } from "@/lib/app";
-import { discountedAmount } from "@/lib/discount";
 import { labourQuoteAmount, linkedProduct } from "@/lib/project-quote";
-
-export { discountedAmount } from "@/lib/discount";
 import { unitSalesPrice } from "@/lib/products";
 import { rubricOf } from "@/lib/rubrics";
 
@@ -54,7 +51,7 @@ export function offerRows(labour: Labour[], materials: Material[], markup: numbe
         description: p?.name || m.description,
         rubric: rubricOf(m),
         sort_order: m.sort_order,
-        amount: vk != null ? discountedAmount(vk * Number(m.quantity), m.discount) : null,
+        amount: vk != null ? vk * Number(m.quantity) : null,
         row: m,
       };
     }),

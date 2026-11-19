@@ -1,5 +1,5 @@
 import { isQuotedLabour, type Labour, type Material } from "@/lib/app";
-import { discountedAmount } from "@/lib/discount";
+import { discountPercent, discountedAmount } from "@/lib/discount";
 import { unitSalesPrice, type Product } from "@/lib/products";
 
 export function linkedProduct(row: { products?: Product | Product[] | null }): Product | null {
@@ -8,8 +8,8 @@ export function linkedProduct(row: { products?: Product | Product[] | null }): P
   return Array.isArray(p) ? p[0] ?? null : p;
 }
 
-export function labourQuoteAmount(l: Pick<Labour, "hours" | "hourly_rate" | "discount">) {
-  return discountedAmount(Number(l.hours) * Number(l.hourly_rate), l.discount);
+export function labourQuoteAmount(l: Pick<Labour, "hours" | "hourly_rate">) {
+  return Number(l.hours) * Number(l.hourly_rate);
 }
 
 export function quotedLabour(list: Labour[] | null | undefined) {
@@ -38,6 +38,7 @@ export function computeQuote(
   materials: Array<Material & { products?: Product | Product[] | null }> | null | undefined,
   vatRate: number,
   fallbackMarkup: number,
+  offerDiscount = 0,
 ): QuoteTotals {
   const lab = quotedLabour(labour);
   const hours = lab.reduce((s, l) => s + Number(l.hours), 0);
@@ -48,17 +49,12 @@ export function computeQuote(
     const p = linkedProduct(m);
     const qty = Number(m.quantity);
     const vk = p ? unitSalesPrice(p, fallbackMarkup) : null;
-    if (vk != null) materialTotal += discountedAmount(vk * qty, m.discount);
+    if (vk != null) materialTotal += vk * qty;
     else unpriced += 1;
   });
-  const subtotal = labourTotal + materialTotal;
-  const labourBeforeDiscount = lab.reduce((s, l) => s + Number(l.hours) * Number(l.hourly_rate), 0);
-  const materialBeforeDiscount = (materials ?? []).reduce((sum, m) => {
-    const p = linkedProduct(m);
-    const vk = p ? unitSalesPrice(p, fallbackMarkup) : null;
-    return sum + (vk != null ? vk * Number(m.quantity) : 0);
-  }, 0);
-  const subtotalBeforeDiscount = labourBeforeDiscount + materialBeforeDiscount;
+  const subtotalBeforeDiscount = labourTotal + materialTotal;
+  const subtotal = discountedAmount(subtotalBeforeDiscount, offerDiscount);
+  const discountTotal = subtotalBeforeDiscount - subtotal;
   const vat = Math.round(subtotal * vatRate) / 100;
   return {
     hours,
@@ -66,10 +62,14 @@ export function computeQuote(
     materialTotal,
     unpriced,
     subtotalBeforeDiscount,
-    discountTotal: subtotalBeforeDiscount - subtotal,
+    discountTotal,
     subtotal,
     vat,
     total: subtotal + vat,
     incomplete: unpriced > 0,
   };
+}
+
+export function quoteDiscountPercent(job: { offer_discount_percent?: number | null }) {
+  return discountPercent(job.offer_discount_percent);
 }

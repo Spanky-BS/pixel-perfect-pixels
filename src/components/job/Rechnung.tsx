@@ -204,7 +204,7 @@ function AkontoSheet({ open, onClose, job, count, onCreated }: { open: boolean; 
   const [busy, setBusy] = useState(false);
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
   const days = Number(settings.data?.akonto_payment_days ?? 14);
-  const offer = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0));
+  const offer = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0), Number(job.offer_discount_percent));
   const net = Number(amount) || 0;
   const t = invoiceTotals(net, vatRate);
 

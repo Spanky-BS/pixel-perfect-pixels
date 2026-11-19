@@ -27,22 +27,9 @@ describe("project quote helpers", () => {
     expect(normalizeStatus("project", "Produktauswahl")).toBe("Offerte");
   });
 
-  it("applies labour discounts to quote totals", () => {
+  it("ignores deprecated position discounts when no quote discount is set", () => {
     const t = computeQuote(
       [{ hours: 2, hourly_rate: 100, discount: 10, source: "manual" } as Labour],
-      [],
-      8.1,
-      0,
-    );
-    expect(t.labourTotal).toBe(180);
-    expect(t.subtotal).toBe(180);
-    expect(t.discountTotal).toBe(20);
-    expect(t.vat).toBe(14.58);
-  });
-
-  it("applies material discounts before VAT", () => {
-    const t = computeQuote(
-      [],
       [{
         quantity: 2,
         discount: 25,
@@ -51,10 +38,31 @@ describe("project quote helpers", () => {
       8.1,
       0,
     );
-    expect(t.materialTotal).toBe(150);
-    expect(t.subtotalBeforeDiscount).toBe(200);
-    expect(t.discountTotal).toBe(50);
-    expect(t.vat).toBe(12.15);
+    expect(t.labourTotal).toBe(200);
+    expect(t.materialTotal).toBe(200);
+    expect(t.subtotalBeforeDiscount).toBe(400);
+    expect(t.discountTotal).toBe(0);
+    expect(t.subtotal).toBe(400);
+  });
+
+  it("applies one quote-level discount before VAT", () => {
+    const t = computeQuote(
+      [{ hours: 2, hourly_rate: 100, source: "manual" } as Labour],
+      [{
+        quantity: 2,
+        products: { purchase_price: 40, sales_price: 100, markup_percent: null },
+      } as never],
+      8.1,
+      0,
+      10,
+    );
+    expect(t.labourTotal).toBe(200);
+    expect(t.materialTotal).toBe(200);
+    expect(t.subtotalBeforeDiscount).toBe(400);
+    expect(t.discountTotal).toBe(40);
+    expect(t.subtotal).toBe(360);
+    expect(t.vat).toBe(29.16);
+    expect(t.total).toBe(389.16);
   });
 
   it("computes quote totals from quoted labour only", () => {

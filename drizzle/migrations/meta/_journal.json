@@ -120,6 +120,13 @@
       "when": 1794611803206,
       "tag": "0016_offer_discounts_and_text_rows",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795075414507,
+      "tag": "0017_single_offer_discount",
+      "breakpoints": true
     }
   ]
 }

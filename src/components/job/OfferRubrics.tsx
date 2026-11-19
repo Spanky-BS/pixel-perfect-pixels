@@ -27,7 +27,6 @@ import {
   Heading,
   Loader2,
   MoreHorizontal,
-  Percent,
   Plus,
   Sparkles,
   Tag,
@@ -40,7 +39,6 @@ import { generateRubricText } from "@/lib/ai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCHF, type Labour, type Material } from "@/lib/app";
-import { discountPercent } from "@/lib/discount";
 import { moveOfferRow, type OfferRow, type OfferTextRow, type OfferTextStyle } from "@/lib/offer-editor";
 import { RUBRICS, groupByRubric, rubricOf } from "@/lib/rubrics";
 import { addCatalogHitToOffer } from "@/lib/suppliers/add-to-offer";
@@ -157,30 +155,6 @@ export function OfferRubrics({
     refresh();
   }
 
-  async function setDiscount(r: EditableRow, value: number) {
-    const { error } = await supabase.from(table(r) as "labour_items").update({ discount: value }).eq("id", r.id);
-    if (error) return toast.error(error.message);
-    refresh();
-  }
-
-  async function applyBulkDiscount(value: number) {
-    const priced = rows.filter(isPricedRow);
-    if (!priced.length) {
-      toast.error("Zuerst Positionen erfassen");
-      return;
-    }
-    const results = await Promise.all(
-      priced.map((r) => supabase.from(table(r) as "labour_items").update({ discount: value }).eq("id", r.id)),
-    );
-    const error = results.find((r) => r.error)?.error;
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(value > 0 ? `${value} % Rabatt auf alle Positionen angewendet` : "Rabatte entfernt");
-    refresh();
-  }
-
   async function saveFreeText(existing: FreeRow | null, code: string, style: OfferTextStyle, text: string) {
     const openingComposer = composer;
     const clean = text.trim();
@@ -209,7 +183,6 @@ export function OfferRubrics({
 
   return (
     <div className="space-y-4">
-      {!locked && rows.some(isPricedRow) && <BulkDiscount onApply={applyBulkDiscount} />}
       {groups.length === 0 && allRubrics.length === 0 && <p className="surface px-4 py-4 text-sm text-muted-foreground">Noch keine Positionen. Rubrik unten hinzufügen.</p>}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(event) => void dropRow(event)}>
         {allRubrics.map((rub) => {
@@ -237,8 +210,8 @@ export function OfferRubrics({
                   }}
                 />
                 {list.some(isPricedRow) && (
-                  <div className="ml-8 hidden grid-cols-[minmax(0,1fr)_80px_100px_64px_100px_36px] gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
-                    <span>Bezeichnung</span><span className="text-right">Menge</span><span className="text-right">Einzelpreis</span><span className="text-right">Rabatt</span><span className="text-right">Total</span><span />
+                  <div className="ml-8 hidden grid-cols-[minmax(0,1fr)_80px_100px_100px_36px] gap-2 border-b border-border bg-muted/40 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:grid">
+                    <span>Bezeichnung</span><span className="text-right">Menge</span><span className="text-right">Einzelpreis</span><span className="text-right">Total</span><span />
                   </div>
                 )}
                 <SortableContext id={`items:${rub.code}`} items={list.map((r) => r.id)} strategy={verticalListSortingStrategy}>
@@ -256,7 +229,6 @@ export function OfferRubrics({
                         onDelete={() => void remove(r)}
                         onEdit={() => isPricedRow(r) && (r.kind === "arbeit" ? onEditLabour(r.row) : onEditMaterial(r.row))}
                         onSaveQty={(v) => { if (isPricedRow(r)) void setQty(r, v); }}
-                        onSaveDiscount={(v) => { if (isPricedRow(r)) void setDiscount(r, v); }}
                         onSaveText={(text) => isFreeRow(r) && void saveFreeText(r, r.rubric, r.kind, text)}
                         onPickProduct={() => isPricedRow(r) && r.kind === "material" && onPickProduct(r.row)}
                       />
@@ -333,7 +305,6 @@ function SortableOfferRow({
   onDelete,
   onEdit,
   onSaveQty,
-  onSaveDiscount,
   onSaveText,
   onPickProduct,
 }: {
@@ -347,7 +318,6 @@ function SortableOfferRow({
   onDelete: () => void;
   onEdit: () => void;
   onSaveQty: (value: number) => void;
-  onSaveDiscount: (value: number) => void;
   onSaveText: (text: string) => void;
   onPickProduct: () => void;
 }) {
@@ -375,7 +345,6 @@ function SortableOfferRow({
           onDelete={onDelete}
           onEdit={onEdit}
           onSaveQty={onSaveQty}
-          onSaveDiscount={onSaveDiscount}
           onPickProduct={onPickProduct}
         />
       )}
@@ -383,7 +352,7 @@ function SortableOfferRow({
   );
 }
 
-function PricedRowContent({ row: r, locked, canUp, canDown, onUp, onDown, onMove, onDelete, onEdit, onSaveQty, onSaveDiscount, onPickProduct }: {
+function PricedRowContent({ row: r, locked, canUp, canDown, onUp, onDown, onMove, onDelete, onEdit, onSaveQty, onPickProduct }: {
   row: EditableRow;
   locked: boolean;
   canUp: boolean;
@@ -394,22 +363,19 @@ function PricedRowContent({ row: r, locked, canUp, canDown, onUp, onDown, onMove
   onDelete: () => void;
   onEdit: () => void;
   onSaveQty: (value: number) => void;
-  onSaveDiscount: (value: number) => void;
   onPickProduct: () => void;
 }) {
   const qty = r.kind === "arbeit" ? Number(r.row.hours) : Number(r.row.quantity);
   const unit = r.kind === "arbeit" ? "h" : r.row.unit;
-  const grossAmount = r.kind === "arbeit" ? Number(r.row.hours) * Number(r.row.hourly_rate) : null;
-  const each = r.kind === "arbeit" ? Number(r.row.hourly_rate) : (r.amount != null && qty > 0 ? discountedUnit(r.amount, qty, r.row.discount) : null);
+  const each = r.kind === "arbeit" ? Number(r.row.hourly_rate) : (r.amount != null && qty > 0 ? r.amount / qty : null);
   return (
-    <div className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-2 py-2 md:grid-cols-[minmax(0,1fr)_80px_100px_64px_100px_36px] md:px-3">
+    <div className="relative grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-2 gap-y-2 px-2 py-2 md:grid-cols-[minmax(0,1fr)_80px_100px_100px_36px] md:px-3">
       <button type="button" disabled={locked} onClick={onEdit} className="col-span-3 min-w-0 pr-6 text-left md:col-span-1 md:pr-0">
         <div className="truncate text-[14px]">{r.description || "–"}</div>
-        <div className="text-[11px] text-muted-foreground">{r.kind === "arbeit" ? "Arbeit" : "Material"}{grossAmount != null && r.amount != null && grossAmount !== r.amount ? ` · vor Rabatt ${formatCHF(grossAmount)}` : ""}</div>
+        <div className="text-[11px] text-muted-foreground">{r.kind === "arbeit" ? "Arbeit" : "Material"}</div>
       </button>
       <QtyInput value={qty} unit={unit} locked={locked} onSave={onSaveQty} />
       <span className="hidden text-right text-sm text-muted-foreground tabular md:block">{each != null ? formatCHF(each) : "–"}</span>
-      <DiscountInput value={discountPercent(r.row.discount)} locked={locked} onSave={onSaveDiscount} />
       {r.kind === "material" && r.amount == null ? (
         <button type="button" disabled={locked} onClick={onPickProduct} className="flex h-8 items-center justify-center gap-1 justify-self-end rounded-full border border-warning/60 bg-warning/10 px-3 text-xs font-medium"><Tag className="h-3.5 w-3.5" /> Produkt</button>
       ) : (
@@ -422,10 +388,6 @@ function PricedRowContent({ row: r, locked, canUp, canDown, onUp, onDown, onMove
       ) : <span className="hidden md:block" />}
     </div>
   );
-}
-
-function discountedUnit(discountedTotal: number, qty: number, discount: number | null) {
-  return discountedTotal / qty / (1 - discountPercent(discount) / 100 || 1);
 }
 
 function positionLine(r: EditableRow) {
@@ -446,50 +408,6 @@ function QtyInput({ value, unit, locked, onSave }: { value: number; unit: string
     <div className="flex items-center justify-end gap-1">
       <input aria-label="Menge" inputMode="decimal" disabled={locked} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} className="h-8 w-14 rounded-md border border-border bg-card px-1.5 text-right text-sm tabular disabled:border-transparent" />
       <span className="w-6 text-xs text-muted-foreground">{unit}</span>
-    </div>
-  );
-}
-
-function DiscountInput({ value, locked, onSave }: { value: number; locked: boolean; onSave: (v: number) => void }) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => setDraft(String(value)), [value]);
-  const commit = () => {
-    const n = Number(draft.replace(",", "."));
-    if (!Number.isFinite(n) || n < 0 || n > 100) {
-      setDraft(String(value));
-      return toast.error("Rabatt zwischen 0 und 100 % eingeben");
-    }
-    if (n !== value) onSave(n);
-  };
-  return (
-    <div className="flex items-center justify-end gap-0.5" title="Rabatt auf diese Position">
-      <input aria-label="Rabatt in Prozent" inputMode="decimal" disabled={locked} value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} className="h-8 w-11 rounded-md border border-border bg-card px-1 text-right text-sm tabular disabled:border-transparent" />
-      <span className="text-xs text-muted-foreground">%</span>
-    </div>
-  );
-}
-
-function BulkDiscount({ onApply }: { onApply: (value: number) => Promise<void> }) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("0");
-  const [busy, setBusy] = useState(false);
-  async function apply() {
-    const n = Number(value.replace(",", "."));
-    if (!Number.isFinite(n) || n < 0 || n > 100) return toast.error("Rabatt zwischen 0 und 100 % eingeben");
-    setBusy(true);
-    try {
-      await onApply(n);
-      setOpen(false);
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (!open) return <button type="button" onClick={() => setOpen(true)} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-medium text-primary"><Percent className="h-4 w-4" /> Rabatt auf alle Positionen</button>;
-  return (
-    <div className="surface flex items-end gap-2 p-3">
-      <label className="min-w-0 flex-1 text-xs font-medium">Rabatt für alle Arbeiten und Produkte<div className="mt-1 flex items-center gap-2"><input autoFocus aria-label="Bulk-Rabatt in Prozent" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-right text-sm tabular" /><span className="text-sm">%</span></div></label>
-      <button type="button" disabled={busy} onClick={() => void apply()} className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50">{busy ? "…" : "Anwenden"}</button>
-      <button type="button" aria-label="Bulk-Rabatt schliessen" onClick={() => setOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-border"><X className="h-4 w-4" /></button>
     </div>
   );
 }

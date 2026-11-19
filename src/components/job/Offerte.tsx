@@ -24,7 +24,7 @@ import {
   type Labour,
   type Material,
 } from "@/lib/app";
-import { computeQuote, labourQuoteAmount, linkedProduct, quotedLabour } from "@/lib/project-quote";
+import { computeQuote, quoteDiscountPercent, quotedLabour } from "@/lib/project-quote";
 import { unitSalesPrice } from "@/lib/products";
 import { round5 } from "@/lib/customer-invoice";
 import { ExclusionsSection, OfferRubrics } from "@/components/job/OfferRubrics";
@@ -76,7 +76,8 @@ export function OfferteWorkspace({
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
   const markup = Number(settings.data?.default_material_markup ?? 0);
   const validDays = Number(settings.data?.offer_valid_days ?? 30);
-  const totals = computeQuote(labour.data, materials.data, vatRate, markup);
+  const offerDiscount = quoteDiscountPercent(job);
+  const totals = computeQuote(labour.data, materials.data, vatRate, markup, offerDiscount);
   const openHours = quoted.filter((l) => !(Number(l.hours) > 0)).length;
   const lastSent = (sent.data ?? []).find((q) => q.status === "Versendet");
   const rate = Number(settings.data?.default_hourly_rate ?? 120);
@@ -153,6 +154,15 @@ export function OfferteWorkspace({
 
       <ExclusionsSection jobId={jobId} list={exclusions} locked={locked} />
 
+      <OfferDiscountEditor
+        jobId={jobId}
+        value={offerDiscount}
+        locked={locked}
+        subtotal={totals.subtotalBeforeDiscount}
+        discountTotal={totals.discountTotal}
+        net={totals.subtotal}
+      />
+
       <section className="surface flex items-center justify-between gap-3 p-4">
         <div className="min-w-0">
           <div className="text-[15px] font-semibold">Preise im PDF</div>
@@ -177,6 +187,7 @@ export function OfferteWorkspace({
         vatRate={vatRate}
         validDays={validDays}
         totals={totals}
+        discountPercent={offerDiscount}
         settings={settings.data}
         onSent={async () => {
           await supabase.from("quotations").insert({ job_id: jobId, status: "Versendet", total: round5(totals.total) });
@@ -211,8 +222,73 @@ export function OfferteWorkspace({
 
 type SettingsRow = { company_name?: string | null; default_technician?: string | null; technician_phone?: string | null } | null | undefined;
 
+function OfferDiscountEditor({ jobId, value, locked, subtotal, discountTotal, net }: {
+  jobId: string;
+  value: number;
+  locked: boolean;
+  subtotal: number;
+  discountTotal: number;
+  net: number;
+}) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+
+  async function save() {
+    const parsed = Number(draft.replace(",", "."));
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+      setDraft(String(value));
+      toast.error("Rabatt zwischen 0 und 100 % eingeben");
+      return;
+    }
+    if (parsed === value) return;
+    const { error } = await supabase.from("jobs").update({ offer_discount_percent: parsed }).eq("id", jobId);
+    if (error) {
+      setDraft(String(value));
+      toast.error(error.message);
+      return;
+    }
+    await qc.invalidateQueries({ queryKey: ["job", jobId] });
+    toast.success(parsed > 0 ? "Offertenrabatt gespeichert" : "Offertenrabatt entfernt");
+  }
+
+  return (
+    <section className="surface space-y-3 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold">Rabatt auf die gesamte Offerte</h3>
+          <p className="text-xs text-muted-foreground">Wird einmal vor MWST und Schlusstotal ausgewiesen.</p>
+        </div>
+        {locked ? (
+          <span className="shrink-0 text-sm font-semibold tabular">{value.toLocaleString("de-CH")} %</span>
+        ) : (
+          <label className="flex h-11 shrink-0 items-center gap-1 rounded-lg border border-border bg-card px-3 text-sm">
+            <input
+              aria-label="Offertenrabatt in Prozent"
+              inputMode="decimal"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => void save()}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              className="w-12 bg-transparent text-right font-semibold tabular outline-none"
+            />
+            <span>%</span>
+          </label>
+        )}
+      </div>
+      {discountTotal > 0 && (
+        <div className="border-t border-border pt-2">
+          <Row label="Zwischensumme" value={formatCHF(subtotal)} />
+          <Row label={`Rabatt ${value.toLocaleString("de-CH")} %`} value={`−${formatCHF(discountTotal)}`} />
+          <Row label="Netto nach Rabatt" value={formatCHF(net)} bold />
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OffertePdfActions({
-  job, rows, texts, exclusions, itemized, vatRate, validDays, totals, settings, onSent,
+  job, rows, texts, exclusions, itemized, vatRate, validDays, totals, discountPercent, settings, onSent,
 }: {
   job: JobWithCustomer;
   rows: OfferRow[];
@@ -222,6 +298,7 @@ function OffertePdfActions({
   vatRate: number;
   validDays: number;
   totals: ReturnType<typeof computeQuote>;
+  discountPercent: number;
   settings: SettingsRow;
   onSent: () => Promise<void>;
 }) {
@@ -319,7 +396,6 @@ function OffertePdfActions({
                         <table key={r.id} className="sr-table of-items"><tbody><tr>
                           <td>{r.description || "–"}</td>
                           <td className="num">{r.kind === "arbeit" ? "" : `${Number(r.row.quantity).toLocaleString("de-CH")} ${r.row.unit}`}</td>
-                          {itemized && <td className="num">{r.row.discount > 0 ? `−${Number(r.row.discount).toLocaleString("de-CH")} %` : ""}</td>}
                           {itemized && <td className="num">{r.amount != null ? formatCHF(r.amount) : "–"}</td>}
                         </tr></tbody></table>
                       );
@@ -341,7 +417,7 @@ function OffertePdfActions({
             <h3>Zusammenfassung</h3>
             <table><tbody>
               {totals.discountTotal > 0 && <tr><td>Zwischensumme vor Rabatt:</td><td className="num">{formatCHF(totals.subtotalBeforeDiscount)}</td></tr>}
-              {totals.discountTotal > 0 && <tr><td>Rabatt:</td><td className="num">−{formatCHF(totals.discountTotal)}</td></tr>}
+              {totals.discountTotal > 0 && <tr><td>Rabatt ({discountPercent.toLocaleString("de-CH")} %):</td><td className="num">−{formatCHF(totals.discountTotal)}</td></tr>}
               <tr><td>Zwischensumme netto:</td><td className="num">{formatCHF(totals.subtotal)}</td></tr>
               <tr><td>MWST {vatRate}%:</td><td className="num">{formatCHF(totals.vat)}</td></tr>
               <tr className="grand"><td>Totalbetrag inkl. MWST:</td><td className="num">{formatCHF(round5(totals.total))}</td></tr>
@@ -359,17 +435,18 @@ function OffertePdfActions({
   );
 }
 
-export function QuoteTotalsCard({ jobId }: { jobId: string }) {
+export function QuoteTotalsCard({ jobId, offerDiscount = 0 }: { jobId: string; offerDiscount?: number }) {
   const settings = useQuery(settingsQuery());
   const labour = useLabour(jobId);
   const materials = useMaterials(jobId);
   const vatRate = Number(settings.data?.vat_rate ?? 8.1);
-  const totals = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0));
+  const totals = computeQuote(labour.data, materials.data, vatRate, Number(settings.data?.default_material_markup ?? 0), offerDiscount);
   return (
     <section className="surface p-4">
       <h3 className="mb-2 text-sm font-semibold">Offerte (SOLL)</h3>
       <Row label="Arbeit" value={`${totals.hours.toLocaleString("de-CH")} h · ${formatCHF(totals.labourTotal)}`} />
       <Row label="Material" value={formatCHF(totals.materialTotal)} />
+      {totals.discountTotal > 0 && <Row label={`Rabatt ${offerDiscount.toLocaleString("de-CH")} %`} value={`−${formatCHF(totals.discountTotal)}`} />}
       <Row label={`MWST ${vatRate}%`} value={formatCHF(totals.vat)} />
       <Row label="Total CHF" value={formatCHF(totals.total)} bold />
     </section>

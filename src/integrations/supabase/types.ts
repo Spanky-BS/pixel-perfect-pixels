@@ -405,6 +405,7 @@ export type Database = {
           job_type: string
           lifecycle_status: string
           notes: string | null
+          offer_discount_percent: number
           offer_exclusions: Json | null
           offer_pricing_mode: string
           offer_rubric_texts: Json
@@ -436,6 +437,7 @@ export type Database = {
           job_type?: string
           lifecycle_status?: string
           notes?: string | null
+          offer_discount_percent?: number
           offer_exclusions?: Json | null
           offer_pricing_mode?: string
           offer_rubric_texts?: Json
@@ -467,6 +469,7 @@ export type Database = {
           job_type?: string
           lifecycle_status?: string
           notes?: string | null
+          offer_discount_percent?: number
           offer_exclusions?: Json | null
           offer_pricing_mode?: string
           offer_rubric_texts?: Json
