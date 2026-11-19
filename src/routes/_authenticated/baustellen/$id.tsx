@@ -20,7 +20,7 @@ import { Row } from "@/components/job/Kalkulation";
 import { Nachkalkulation } from "@/components/job/Nachkalkulation";
 import { SupplierInvoices } from "@/components/job/SupplierInvoices";
 import { ServiceJobView } from "@/components/job/ServiceJob";
-import { OfferteWorkspace, QuoteTotalsCard } from "@/components/job/Offerte";
+import { OfferteWorkspace } from "@/components/job/Offerte";
 import { AusfuehrungWorkspace } from "@/components/job/Ausfuehrung";
 import { RechnungWorkspace, useCustomerInvoices } from "@/components/job/Rechnung";
 import { DEFAULT_SERVICE_PHOTO_CATEGORY, JOB_TYPE_LABEL, PROJECT_STEPS, address, customerName, displayServiceStatus, formatDate, normalizeStatus, type Customer, type Job, type Labour, type Material } from "@/lib/app";
@@ -469,9 +469,16 @@ function AbrechnungStep({ job }: { job: Job & { customers?: Partial<Customer> | 
   return (
     <div className="space-y-4">
       <RechnungWorkspace job={job} />
-      <QuoteTotalsCard jobId={job.id} offerDiscount={Number(job.offer_discount_percent)} />
-      <SupplierInvoices jobId={job.id} />
-      <Nachkalkulation jobId={job.id} />
+      <details className="group rounded-xl border border-border bg-card">
+        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium text-muted-foreground">
+          Intern: Lieferantenrechnungen & Nachkalkulation
+          <span className="text-xs group-open:hidden">anzeigen</span>
+        </summary>
+        <div className="space-y-4 border-t border-border p-3">
+          <SupplierInvoices jobId={job.id} />
+          <Nachkalkulation jobId={job.id} />
+        </div>
+      </details>
     </div>
   );
 }

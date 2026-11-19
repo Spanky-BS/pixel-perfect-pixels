@@ -5,7 +5,7 @@ import { unitSalesPrice, type Product } from "@/lib/products";
 import { rubricOf } from "@/lib/rubrics";
 
 /** One invoice row. Lines are stored as a snapshot on the invoice so the PDF never changes afterwards. */
-export type InvoiceLine = { kind: "arbeit" | "material" | "akonto"; rubric?: string; description: string; qty: number; unit: string; price: number; amount: number };
+export type InvoiceLine = { kind: "arbeit" | "material" | "akonto" | "rabatt"; extra?: boolean; rubric?: string; description: string; qty: number; unit: string; price: number; amount: number };
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
 /** Swiss cash rounding to 5 Rappen. */
@@ -13,7 +13,7 @@ export const round5 = (n: number) => Math.round(n * 20) / 20;
 
 type LabourIn = { id: string; description: string; rubric?: string | null; hourly_rate: number | string | null; hours?: number | string | null; source?: string | null };
 type TimeIn = { labour_item_id: string | null; hours: number | string };
-type MaterialIn = { description: string; rubric?: string | null; unit: string; quantity: number | string; actual_quantity?: number | string | null; products?: Product | Product[] | null };
+type MaterialIn = { description: string; rubric?: string | null; unit: string; quantity: number | string; actual_quantity?: number | string | null; source?: string | null; products?: Product | Product[] | null };
 
 /**
  * Project invoice: offered work is billed as offered (offer hours); only extra work recorded in
@@ -26,6 +26,8 @@ export function invoiceLinesFromActuals(input: {
   materials: MaterialIn[];
   defaultRate: number;
   markup: number;
+  /** Offer-wide discount in %; applies to offered positions only, never to Nachverrechnung. */
+  discountPercent?: number;
 }) {
   const lines: InvoiceLine[] = [];
   let hours = 0;
@@ -36,7 +38,8 @@ export function invoiceLinesFromActuals(input: {
     if (h <= 0) continue;
     const rate = Number(l.hourly_rate) || input.defaultRate;
     hours += h;
-    lines.push({ kind: "arbeit", rubric: rubricOf(l), description: l.description || "Arbeit", qty: round2(h), unit: "h", price: rate, amount: round2(h * rate) });
+    const extra = l.source === "execution";
+    lines.push({ kind: "arbeit", rubric: rubricOf(l), description: l.description || "Arbeit", qty: round2(h), unit: "h", price: rate, amount: round2(h * rate), ...(extra ? { extra } : {}) });
   }
   let unpriced = 0;
   for (const m of input.materials) {
@@ -46,9 +49,17 @@ export function invoiceLinesFromActuals(input: {
     const p = Array.isArray(raw) ? raw[0] ?? null : raw ?? null;
     const vk = p ? unitSalesPrice(p, input.markup) : null;
     if (vk == null) { unpriced += 1; continue; }
-    lines.push({ kind: "material", rubric: rubricOf(m), description: p?.name || m.description || "Material", qty, unit: m.unit || "Stk", price: round2(vk), amount: round2(vk * qty) });
+    const extra = m.source === "execution";
+    lines.push({ kind: "material", rubric: rubricOf(m), description: p?.name || m.description || "Material", qty, unit: m.unit || "Stk", price: round2(vk), amount: round2(vk * qty), ...(extra ? { extra } : {}) });
   }
-  return { lines, hours: round2(hours), unpriced };
+  const offerGross = round2(lines.filter((l) => !l.extra).reduce((s, l) => s + l.amount, 0));
+  const extraNet = round2(lines.filter((l) => l.extra).reduce((s, l) => s + l.amount, 0));
+  const pct = Math.min(100, Math.max(0, Number(input.discountPercent) || 0));
+  const discount = round2((offerGross * pct) / 100);
+  if (discount > 0) {
+    lines.push({ kind: "rabatt", description: `Rabatt ${pct.toLocaleString("de-CH")} % auf Offerte`, qty: 1, unit: "", price: -discount, amount: -discount });
+  }
+  return { lines, hours: round2(hours), unpriced, offerGross, offerNet: round2(offerGross - discount), discount, extraNet };
 }
 
 /** Net → VAT → total (5 Rappen) → minus already invoiced Akonto (incl. VAT) → amount due. */

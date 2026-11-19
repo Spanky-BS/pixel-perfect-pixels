@@ -68,14 +68,16 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
     materials: (materials.data ?? []) as never,
     defaultRate: Number(s?.default_hourly_rate ?? 120),
     markup,
+    discountPercent: Number(job.offer_discount_percent ?? 0),
   });
   const list = invoices.data ?? [];
   const akontos = list.filter((i) => i.kind === "akonto" && i.status !== "storniert");
   const akontoSum = round2(akontos.reduce((sum, i) => sum + Number(i.total), 0));
   const schluss = list.find((i) => i.kind === "schluss" && i.status !== "storniert");
   const preview = invoiceTotals(sumLines(actual.lines), vatRate, akontoSum);
-  const work = actual.lines.filter((l) => l.kind === "arbeit");
-  const mats = actual.lines.filter((l) => l.kind === "material");
+  const quote = computeQuote(labour.data, materials.data as never, vatRate, markup, Number(job.offer_discount_percent ?? 0));
+  const offerNet = round2(quote.subtotal);
+  const changes = round2(preview.net - offerNet - actual.extraNet);
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["customer_invoices", jobId] });
     qc.invalidateQueries({ queryKey: ["job", jobId] });
@@ -135,26 +137,26 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
         )}
       </section>
 
-      {(iban !== "ok" || actual.unpriced > 0 || !work.length) && (
+      {(iban !== "ok" || actual.unpriced > 0) && (
         <div className="flex gap-2.5 rounded-xl border border-warning/50 bg-warning/10 px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <div className="space-y-0.5">
             {iban === "missing" && <p>Für den QR-Einzahlungsschein fehlt die IBAN. <Link to="/einstellungen" className="font-medium text-primary">In Einstellungen erfassen</Link></p>}
             {iban === "invalid" && <p>Die IBAN in den Einstellungen ist ungültig. <Link to="/einstellungen" className="font-medium text-primary">Prüfen</Link></p>}
-            {!work.length && <p>Noch keine Stunden in der Ausführung erfasst.</p>}
             {actual.unpriced > 0 && <p>{actual.unpriced} Material ohne Preis – wird nicht verrechnet.</p>}
           </div>
         </div>
       )}
 
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between px-1">
-          <h2 className="section-title">Aufwand</h2>
-          <span className="text-sm text-muted-foreground tabular">{actual.hours.toLocaleString("de-CH")} h</span>
-        </div>
-        <div className="list-group">
-          {!actual.lines.length && <p className="px-4 py-4 text-sm text-muted-foreground">Noch nichts erfasst. Stunden und Ist-Mengen kommen aus der Ausführung.</p>}
-          {[...work, ...mats].map((l, i) => <LineRow key={i} l={l} />)}
+      <section className="list-group">
+        <SumRow label="Bestätigte Offerte" hint={quote.discountTotal > 0 ? `inkl. Rabatt ${formatCHF(quote.discountTotal)}` : undefined} value={offerNet} />
+        {Math.abs(changes) >= 0.01 && <SumRow label="Mengenänderungen Material" hint="Ist-Mengen aus der Ausführung" value={changes} />}
+        <SumRow label="Nachverrechnung aus Ausführung" hint="Zusatzarbeit & Zusatzmaterial" value={actual.extraNet} />
+        <SumRow label={`MWST ${vatRate}%`} value={preview.vat} />
+        {akontoSum > 0 && <SumRow label="Bereits verrechnete Akontos" value={-akontoSum} />}
+        <div className="flex min-h-12 items-center justify-between px-4 py-3">
+          <span className="text-[15px] font-semibold">Rechnungsbetrag</span>
+          <span className="text-[17px] font-semibold tabular">{formatCHF(preview.amountDue)}</span>
         </div>
       </section>
 
@@ -184,14 +186,14 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
   );
 }
 
-function LineRow({ l }: { l: InvoiceLine }) {
+function SumRow({ label, hint, value }: { label: string; hint?: string | undefined; value: number }) {
   return (
     <div className="flex min-h-12 items-center gap-3 px-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[15px]">{l.description}</div>
-        <div className="text-xs text-muted-foreground tabular">{l.qty.toLocaleString("de-CH")} {l.unit} × {formatCHF(l.price)}</div>
+        <div className="text-[15px]">{label}</div>
+        {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
       </div>
-      <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(l.amount)}</span>
+      <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(value)}</span>
     </div>
   );
 }
@@ -317,7 +319,7 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
   const lines = (inv.lines as unknown as InvoiceLine[]) ?? [];
   const work = lines.filter((l) => l.kind === "arbeit");
   const mats = lines.filter((l) => l.kind === "material");
-  const other = lines.filter((l) => l.kind === "akonto");
+  const other = lines.filter((l) => l.kind === "akonto" || l.kind === "rabatt");
   const custLines = c ? [c.company_name, [c.first_name, c.last_name].filter(Boolean).join(" "), c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
   const label = INVOICE_KIND_LABEL[inv.kind as "akonto" | "schluss"];
 

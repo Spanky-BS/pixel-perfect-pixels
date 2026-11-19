@@ -20,11 +20,30 @@ describe("customer invoice", () => {
     });
     expect(r.lines).toEqual([
       { kind: "arbeit", rubric: "250", description: "Montage Pissoir", qty: 4, unit: "h", price: 130, amount: 520 },
-      { kind: "arbeit", rubric: expect.any(String), description: "Zusatzleitung", qty: 1.5, unit: "h", price: 120, amount: 180 },
+      { kind: "arbeit", rubric: expect.any(String), description: "Zusatzleitung", qty: 1.5, unit: "h", price: 120, amount: 180, extra: true },
       { kind: "material", rubric: "250", description: "Pissoir", qty: 1, unit: "Stk", price: 400, amount: 400 },
     ]);
     expect(r.hours).toBe(5.5);
     expect(r.unpriced).toBe(1);
+  });
+
+  it("applies the offer discount to offered positions only, not to Nachverrechnung", () => {
+    const r = invoiceLinesFromActuals({
+      labour: [
+        { id: "a", description: "Montage", hourly_rate: 100, hours: 10, source: "ai" },
+        { id: "x", description: "Zusatz", hourly_rate: 100, hours: 0, source: "execution" },
+      ],
+      times: [{ labour_item_id: "x", hours: 2 }],
+      materials: [{ description: "WC", unit: "Stk", quantity: 1, products: { sales_price: 1000, purchase_price: null, markup: null } as never }],
+      defaultRate: 120,
+      markup: 0,
+      discountPercent: 4,
+    });
+    expect(r.offerGross).toBe(2000);
+    expect(r.discount).toBe(80);
+    expect(r.offerNet).toBe(1920);
+    expect(r.extraNet).toBe(200);
+    expect(r.lines.reduce((s, l) => s + l.amount, 0)).toBe(2120);
   });
 
   it("adds 8.1% VAT, rounds to 5 Rappen and deducts Akonto", () => {
