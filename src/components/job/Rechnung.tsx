@@ -123,7 +123,7 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
     <div className="space-y-4 pb-4">
       <section className="overflow-hidden rounded-xl bg-primary text-primary-foreground" style={{ background: "var(--gradient-primary)", boxShadow: "var(--shadow-primary)" }}>
         <div className="p-5 pb-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Nach effektivem Aufwand · inkl. MWST</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.08em] opacity-70">Offerte + Nachverrechnung · inkl. MWST</div>
           <div className="mt-1 text-[34px] font-semibold leading-none tracking-tight tabular">{formatCHF(preview.total)}</div>
           <div className="mt-2 text-sm opacity-80 tabular">Netto {formatCHF(preview.net)} · MWST {vatRate}% {formatCHF(preview.vat)}</div>
         </div>
