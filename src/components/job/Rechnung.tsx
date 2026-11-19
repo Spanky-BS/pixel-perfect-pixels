@@ -3,7 +3,8 @@ import { flushSync } from "react-dom";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Circle, Download, Mail, Plus, Receipt, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Download, Mail, Pencil, Plus, Receipt, RefreshCw, Trash2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { SwissQRBill } from "swissqrbill/svg";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -56,6 +57,7 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
   const invoices = useCustomerInvoices(jobId);
   const [akontoOpen, setAkontoOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [condOpen, setCondOpen] = useState(false);
 
   const s = settings.data;
   const vatRate = Number(s?.vat_rate ?? 8.1);
@@ -91,19 +93,36 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
     }
   }
 
-  async function createSchluss() {
+  const amounts = {
+    lines: actual.lines as never,
+    net: preview.net,
+    vat_rate: vatRate,
+    vat: preview.vat,
+    total: preview.total,
+    akonto_deducted: preview.akontoDeducted,
+    amount_due: preview.amountDue,
+    rubric_texts: (job.offer_rubric_texts ?? {}) as never,
+  };
+
+  async function saveSchluss(cond: Conditions) {
+    if (schluss) {
+      const { error } = await supabase.from("customer_invoices").update(cond).eq("id", schluss.id);
+      if (error) return toast.error(error.message);
+      toast.success("Konditionen gespeichert");
+      setCondOpen(false);
+      return refresh();
+    }
     if (!actual.lines.length) return toast.error("Noch keine Stunden oder kein Material erfasst");
     if (actual.unpriced && !confirm(`${actual.unpriced} Material ohne Preis wird nicht verrechnet. Trotzdem erstellen?`)) return;
     setCreating(true);
     try {
-      const date = todayISO();
       const { error } = await supabase.from("customer_invoices").insert({
         job_id: jobId,
         kind: "schluss",
         number: await newNumber(),
-        invoice_date: date,
-        due_date: addDays(date, payDays),
+        ...cond,
         title: job.title,
+        rubric_texts: amounts.rubric_texts,
         lines: actual.lines,
         net: preview.net,
         vat_rate: vatRate,
@@ -115,11 +134,22 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
       if (error) return toast.error(error.message);
       await moveToRechnung();
       toast.success("Schlussrechnung erstellt");
+      setCondOpen(false);
       refresh();
     } finally {
       setCreating(false);
     }
   }
+
+  async function recalc() {
+    if (!schluss) return;
+    if (!confirm("Schlussrechnung mit den aktuellen Zahlen aus Offerte und Ausführung neu berechnen?")) return;
+    const { error } = await supabase.from("customer_invoices").update(amounts).eq("id", schluss.id);
+    if (error) return toast.error(error.message);
+    toast.success("Schlussrechnung aktualisiert");
+    refresh();
+  }
+  const outdated = !!schluss && (Math.abs(Number(schluss.amount_due) - preview.amountDue) >= 0.01 || JSON.stringify(schluss.rubric_texts ?? {}) !== JSON.stringify(job.offer_rubric_texts ?? {}));
 
   return (
     <div className="space-y-4 pb-4">
@@ -171,16 +201,29 @@ export function RechnungWorkspace({ job }: { job: JobWithCustomer }) {
             <Plus className="h-4 w-4 text-primary" /> Akontorechnung
           </button>
           <button
-            onClick={() => void createSchluss()}
-            disabled={creating || !!schluss || !actual.lines.length}
+            onClick={() => setCondOpen(true)}
+            disabled={creating || (!schluss && !actual.lines.length)}
             className="flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
-            <Receipt className="h-4 w-4" /> {schluss ? "Schlussrechnung erstellt" : "Schlussrechnung"}
+            {schluss ? <><Pencil className="h-4 w-4" /> Konditionen</> : <><Receipt className="h-4 w-4" /> Schlussrechnung</>}
           </button>
         </div>
-        {schluss && <p className="px-1 text-xs text-muted-foreground">Für eine neue Berechnung die bestehende Schlussrechnung löschen.</p>}
+        {outdated && schluss?.status !== "bezahlt" && (
+          <button onClick={() => void recalc()} className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-warning/60 bg-warning/10 text-sm font-medium">
+            <RefreshCw className="h-4 w-4" /> Zahlen geändert – Schlussrechnung neu berechnen
+          </button>
+        )}
       </section>
 
+      <ConditionsSheet
+        open={condOpen}
+        onClose={() => setCondOpen(false)}
+        job={job}
+        invoice={schluss ?? null}
+        defaultDays={payDays}
+        busy={creating}
+        onSave={(c) => void saveSchluss(c)}
+      />
       <AkontoSheet open={akontoOpen} onClose={() => setAkontoOpen(false)} job={job} count={akontos.length} onCreated={async () => { await moveToRechnung(); refresh(); }} />
     </div>
   );
@@ -195,6 +238,83 @@ function SumRow({ label, hint, value }: { label: string; hint?: string | undefin
       </div>
       <span className="shrink-0 text-[15px] font-medium tabular">{formatCHF(value)}</span>
     </div>
+  );
+}
+
+type Conditions = { invoice_date: string; due_date: string; billing_address: string | null; terms_text: string | null };
+
+function customerAddressText(c: Partial<Customer> | null | undefined) {
+  if (!c) return "";
+  return [c.company_name, [c.first_name, c.last_name].filter(Boolean).join(" "), c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean).join("\n");
+}
+
+function daysBetween(a: string, b: string) {
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+}
+
+function ConditionsSheet({ open, onClose, job, invoice, defaultDays, busy, onSave }: {
+  open: boolean; onClose: () => void; job: JobWithCustomer; invoice: Invoice | null; defaultDays: number; busy: boolean; onSave: (c: Conditions) => void;
+}) {
+  const [date, setDate] = useState(todayISO());
+  const [days, setDays] = useState(String(defaultDays));
+  const [other, setOther] = useState(false);
+  const [addr, setAddr] = useState("");
+  const [terms, setTerms] = useState("");
+  const [lastOpen, setLastOpen] = useState(false);
+  if (open !== lastOpen) {
+    setLastOpen(open);
+    if (open) {
+      setDate(invoice?.invoice_date ?? todayISO());
+      setDays(String(invoice ? daysBetween(invoice.invoice_date, invoice.due_date) : defaultDays));
+      setOther(!!invoice?.billing_address);
+      setAddr(invoice?.billing_address ?? customerAddressText(job.customers));
+      setTerms(invoice?.terms_text ?? "");
+    }
+  }
+  const d = Math.max(0, Number(days) || 0);
+  return (
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-2xl">
+        <SheetHeader><SheetTitle>{invoice ? `Schlussrechnung ${invoice.number}` : "Schlussrechnung erstellen"}</SheetTitle></SheetHeader>
+        <div className="space-y-4 p-4 pt-0">
+          <Field label="Rechnungsdatum">
+            <Input className="h-12 text-base" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Zahlungsfrist">
+            <div className="flex flex-wrap gap-1.5">
+              {[10, 14, 30, 60].map((n) => (
+                <button key={n} type="button" onClick={() => setDays(String(n))} className={`h-10 rounded-full border px-4 text-sm ${d === n ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/50"}`}>
+                  {n} Tage
+                </button>
+              ))}
+              <Input className="h-10 w-24 text-base tabular" type="number" inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} aria-label="Tage" />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Zahlbar bis {formatISODate(addDays(date, d))}</p>
+          </Field>
+          <Field label="Rechnungsadresse">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => { setOther(false); setAddr(customerAddressText(job.customers)); }} className={`h-10 rounded-lg border text-sm ${!other ? "border-primary bg-primary/10 font-medium text-primary" : "border-border"}`}>Wie Kunde</button>
+              <button type="button" onClick={() => setOther(true)} className={`h-10 rounded-lg border text-sm ${other ? "border-primary bg-primary/10 font-medium text-primary" : "border-border"}`}>Abweichend</button>
+            </div>
+            {other ? (
+              <Textarea className="mt-2 min-h-28 text-base" value={addr} onChange={(e) => setAddr(e.target.value)} placeholder={"z.B. Verwaltung Muster AG\nz.H. Frau Meier\nHauptstrasse 1\n4051 Basel"} />
+            ) : (
+              <p className="mt-2 whitespace-pre-line rounded-lg bg-muted/60 px-3 py-2 text-sm">{customerAddressText(job.customers) || "Kein Kunde hinterlegt"}</p>
+            )}
+          </Field>
+          <Field label="Bemerkung / Konditionen (optional)">
+            <Textarea className="min-h-20 text-base" value={terms} onChange={(e) => setTerms(e.target.value)} placeholder="z.B. Zahlbar netto ohne Abzug. Bei Zahlung innert 10 Tagen 2% Skonto." />
+          </Field>
+          <button
+            disabled={busy || !date}
+            onClick={() => onSave({ invoice_date: date, due_date: addDays(date, d), billing_address: other && addr.trim() ? addr.trim() : null, terms_text: terms.trim() || null })}
+            className="flex h-12 w-full items-center justify-center rounded-xl bg-primary text-[15px] font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {invoice ? "Speichern" : "Schlussrechnung erstellen"}
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -317,10 +437,13 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
   }
 
   const lines = (inv.lines as unknown as InvoiceLine[]) ?? [];
-  const work = lines.filter((l) => l.kind === "arbeit");
-  const mats = lines.filter((l) => l.kind === "material");
-  const other = lines.filter((l) => l.kind === "akonto" || l.kind === "rabatt");
-  const custLines = c ? [c.company_name, [c.first_name, c.last_name].filter(Boolean).join(" "), c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
+  const offerLines = lines.filter((l) => (l.kind === "arbeit" || l.kind === "material") && !l.extra);
+  const extraLines = lines.filter((l) => (l.kind === "arbeit" || l.kind === "material") && l.extra);
+  const akontoLines = lines.filter((l) => l.kind === "akonto");
+  const rabatt = sumLines(lines.filter((l) => l.kind === "rabatt"));
+  const texts = (inv.rubric_texts ?? {}) as Record<string, string>;
+  const custLines = inv.billing_address ? inv.billing_address.split("\n") : c ? [c.company_name, [c.first_name, c.last_name].filter(Boolean).join(" "), c.street, [c.zip, c.city].filter(Boolean).join(" ")].filter(Boolean) : ["–"];
+  const payDaysInv = daysBetween(inv.invoice_date, inv.due_date);
   const label = INVOICE_KIND_LABEL[inv.kind as "akonto" | "schluss"];
 
   return (
@@ -375,11 +498,15 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
                 </dl>
               </div>
             </div>
-            <RubricInvoiceTables lines={[...work, ...mats]} />
-            <InvoiceTable title="Leistung" qtyLabel="" lines={other} />
+            <RubricInvoiceTables lines={offerLines} texts={texts} />
+            <InvoiceTable title="Nachverrechnung Ausführung" qtyLabel="Menge" lines={extraLines} />
+            <InvoiceTable title="Leistung" qtyLabel="" lines={akontoLines} />
             <div className="sr-tot">
               <h3>Zusammenfassung</h3>
               <table><tbody>
+                {rabatt !== 0 && <tr><td>Offerte vor Rabatt:</td><td className="num">{formatCHF(sumLines(offerLines))}</td></tr>}
+                {rabatt !== 0 && <tr><td>Rabatt:</td><td className="num">−{formatCHF(-rabatt)}</td></tr>}
+                {extraLines.length > 0 && <tr><td>Nachverrechnung:</td><td className="num">{formatCHF(sumLines(extraLines))}</td></tr>}
                 <tr><td>Total netto:</td><td className="num">{formatCHF(Number(inv.net))}</td></tr>
                 <tr><td>MWST {Number(inv.vat_rate)}%:</td><td className="num">{formatCHF(Number(inv.vat))}</td></tr>
                 <tr><td>Total inkl. MWST:</td><td className="num">{formatCHF(Number(inv.total))}</td></tr>
@@ -388,7 +515,8 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
               </tbody></table>
             </div>
             <p style={{ marginTop: 14 }}>
-              Zahlbar innert {Math.round((Date.parse(inv.due_date) - Date.parse(inv.invoice_date)) / 86_400_000)} Tagen bis {formatISODate(inv.due_date)}.
+              {inv.terms_text && <>{inv.terms_text}<br /></>}
+              Zahlbar innert {payDaysInv} Tagen bis {formatISODate(inv.due_date)}.
               {ibanStatus(s?.iban) === "ok" ? " Der QR-Einzahlungsschein befindet sich auf der letzten Seite." : ""} Vielen Dank für Ihren Auftrag.
             </p>
             <footer className="sr-foot"><span>{company}</span><span>{inv.number}</span></footer>
@@ -399,32 +527,31 @@ function InvoiceRow({ inv, job, onChange }: { inv: Invoice; job: JobWithCustomer
   );
 }
 
-function RubricInvoiceTables({ lines }: { lines: InvoiceLine[] }) {
+function RubricInvoiceTables({ lines, texts }: { lines: InvoiceLine[]; texts: Record<string, string> }) {
   const groups = groupByRubric(lines, (l) => l.amount);
   return (
     <>
       {groups.map((g) => {
         const single = g.rubrics.length === 1 && g.rubrics[0]!.rubric.code === g.group;
         return (
-          <section key={g.group} className="sr-sec">
-            {!single && <h3 style={{ fontSize: 13 }}>{g.group} &nbsp; {g.title}</h3>}
-            {g.rubrics.map((rg) => (
-              <table key={rg.rubric.code} className="sr-table" style={{ marginBottom: 8 }}>
-                <thead><tr><th>{rg.rubric.code} &nbsp; {rg.rubric.title}</th><th className="num">Menge</th><th className="num">Ansatz</th><th className="num">Betrag</th></tr></thead>
-                <tbody>
-                  {rg.items.map((l, i) => (
-                    <tr key={i}>
-                      <td>{l.description}</td>
-                      <td className="num">{l.qty.toLocaleString("de-CH")} {l.unit}</td>
-                      <td className="num">{formatCHF(l.price)}</td>
-                      <td className="num">{formatCHF(l.amount)}</td>
-                    </tr>
+          <section key={g.group} className="of-group">
+            <h2 className="of-group-h"><span>{g.group}</span>{g.title}</h2>
+            {g.rubrics.map((rg) => {
+              const text = texts[rg.rubric.code]?.trim();
+              return (
+                <div key={rg.rubric.code} className="of-rub">
+                  {!single && <h3 className="of-rub-h"><span>{rg.rubric.code}</span>{rg.rubric.title}</h3>}
+                  {text ? <p className="of-text">{text}</p> : rg.items.map((l, i) => (
+                    <table key={i} className="sr-table of-items"><tbody><tr>
+                      <td>{l.description || "–"}</td>
+                      <td className="num">{l.kind === "arbeit" ? "" : `${l.qty.toLocaleString("de-CH")} ${l.unit}`}</td>
+                    </tr></tbody></table>
                   ))}
-                </tbody>
-                <tfoot><tr><td colSpan={3}>{rg.rubric.code} Total {rg.rubric.title}</td><td className="num">{formatCHF(rg.total)}</td></tr></tfoot>
-              </table>
-            ))}
-            {!single && <table className="sr-table"><tfoot><tr><td>{g.group} Total {g.title}</td><td className="num">{formatCHF(g.total)}</td></tr></tfoot></table>}
+                  <div className="of-sum"><span>Total {rg.rubric.code} {rg.rubric.title}</span><span>{formatCHF(rg.total)}</span></div>
+                </div>
+              );
+            })}
+            {!single && <div className="of-gsum"><span>Total {g.group} {g.title}</span><span>{formatCHF(g.total)}</span></div>}
           </section>
         );
       })}

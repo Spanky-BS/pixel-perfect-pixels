@@ -134,6 +134,13 @@
       "when": 1795086183404,
       "tag": "0018_workday_time_entries",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795104420598,
+      "tag": "0019_invoice_conditions",
+      "breakpoints": true
     }
   ]
 }

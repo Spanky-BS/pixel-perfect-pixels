@@ -1,0 +1,1 @@
+ALTER TABLE public.customer_invoices ADD COLUMN IF NOT EXISTS billing_address text, ADD COLUMN IF NOT EXISTS terms_text text, ADD COLUMN IF NOT EXISTS rubric_texts jsonb NOT NULL DEFAULT '{}'::jsonb;

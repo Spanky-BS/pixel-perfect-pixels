@@ -180,6 +180,7 @@ export type Database = {
         Row: {
           akonto_deducted: number
           amount_due: number
+          billing_address: string | null
           created_at: string
           due_date: string
           id: string
@@ -190,8 +191,10 @@ export type Database = {
           net: number
           number: string
           paid_at: string | null
+          rubric_texts: Json
           sent_at: string | null
           status: string
+          terms_text: string | null
           title: string
           total: number
           user_id: string
@@ -201,6 +204,7 @@ export type Database = {
         Insert: {
           akonto_deducted?: number
           amount_due?: number
+          billing_address?: string | null
           created_at?: string
           due_date: string
           id?: string
@@ -211,8 +215,10 @@ export type Database = {
           net?: number
           number: string
           paid_at?: string | null
+          rubric_texts?: Json
           sent_at?: string | null
           status?: string
+          terms_text?: string | null
           title?: string
           total?: number
           user_id?: string
@@ -222,6 +228,7 @@ export type Database = {
         Update: {
           akonto_deducted?: number
           amount_due?: number
+          billing_address?: string | null
           created_at?: string
           due_date?: string
           id?: string
@@ -232,8 +239,10 @@ export type Database = {
           net?: number
           number?: string
           paid_at?: string | null
+          rubric_texts?: Json
           sent_at?: string | null
           status?: string
+          terms_text?: string | null
           title?: string
           total?: number
           user_id?: string
